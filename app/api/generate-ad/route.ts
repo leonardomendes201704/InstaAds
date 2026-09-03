@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 import { generateAdArtworks } from "@/lib/gemini";
+import { attachSessionCookie, getOrCreateSessionId } from "@/lib/session";
+import { isStorageConfigured, saveGeneration } from "@/lib/storage";
 
 export const maxDuration = 120;
 
@@ -22,6 +24,9 @@ export async function POST(request: Request) {
       );
     }
 
+    const { sessionId, isNew } = await getOrCreateSessionId();
+    const generationId = crypto.randomUUID();
+
     const result = await generateAdArtworks({
       photoBase64: body.photoBase64,
       photoMimeType: body.photoMimeType ?? "image/jpeg",
@@ -31,7 +36,43 @@ export async function POST(request: Request) {
       publishTarget: body.publishTarget,
     });
 
-    return NextResponse.json(result);
+    let stored = false;
+
+    if (isStorageConfigured()) {
+      try {
+        await saveGeneration({
+          sessionId,
+          generationId,
+          photoBase64: body.photoBase64,
+          photoMimeType: body.photoMimeType ?? "image/jpeg",
+          feedImage: result.feedImage,
+          storiesImage: result.storiesImage,
+          metadata: {
+            status: "success",
+            adCategory: body.adCategory,
+            adStyle: body.adStyle,
+            mainMessage: body.mainMessage ?? "",
+            publishTarget: body.publishTarget,
+            headline: result.headline,
+            subheadline: result.subheadline,
+            benefits: result.benefits,
+            cta: result.cta,
+          },
+        });
+        stored = true;
+      } catch (storageError) {
+        console.error("Falha ao salvar geração no Blob:", storageError);
+      }
+    }
+
+    const response = NextResponse.json({
+      ...result,
+      generationId,
+      stored,
+    });
+
+    attachSessionCookie(response, sessionId, isNew);
+    return response;
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Erro ao gerar anúncio.";
