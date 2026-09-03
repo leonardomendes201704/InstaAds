@@ -35,26 +35,27 @@ Contexto visual:
 - Canal: ${publishLabels[input.publishTarget]}
 - ${formatInstructions}
 
-=== TEXTOS OBRIGATÓRIOS (CRÍTICO) ===
-Você DEVE renderizar na arte EXATAMENTE os textos abaixo, caractere por caractere, sem alterar uma letra:
+=== TEXTOS PARA COLOCAR NA ARTE (CRÍTICO) ===
+Renderize SOMENTE o conteúdo abaixo. Copie cada frase exatamente, caractere por caractere.
 
-HEADLINE (texto grande no topo):
+Texto em destaque (grande, no topo):
 "${copy.headline}"
 
-SUBHEADLINE (texto médio abaixo da headline):
+Texto de apoio (médio, logo abaixo):
 "${copy.subheadline}"
 
-BENEFÍCIOS (lista com bullets, 3 itens):
-1. "${copy.benefits[0]}"
-2. "${copy.benefits[1]}"
-3. "${copy.benefits[2]}"
+Três benefícios em lista com bullets:
+• ${copy.benefits[0]}
+• ${copy.benefits[1]}
+• ${copy.benefits[2]}
 
-CTA (texto dentro do botão de ação):
+Texto do botão de ação:
 "${copy.cta}"
 
 REGRAS DE TEXTO — OBRIGATÓRIO:
 - Idioma: APENAS português do Brasil (PT-BR)
 - PROIBIDO: inglês, espanhol, palavras inventadas, erros de ortografia, traduções
+- PROIBIDO renderizar rótulos de layout na imagem (ex.: HEADLINE, SUBHEADLINE, BENEFITS, CTA, TÍTULO, SUBTÍTULO)
 - NÃO crie, NÃO traduza, NÃO reformule, NÃO abrevie os textos acima
 - Use tipografia sans-serif legível em celular, com bom contraste
 - Se não conseguir renderizar texto perfeito, priorize copiar exatamente as frases acima`;
