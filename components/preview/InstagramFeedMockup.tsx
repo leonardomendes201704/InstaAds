@@ -34,7 +34,7 @@ export function InstagramFeedMockup({
         </div>
       </div>
 
-      <div className="relative aspect-square w-full bg-gray-100">
+      <div className="relative aspect-[4/5] w-full bg-gray-100">
         <Image src={imageUrl} alt="Prévia do anúncio" fill className="object-cover" unoptimized />
       </div>
 

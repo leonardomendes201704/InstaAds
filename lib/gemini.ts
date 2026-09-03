@@ -1,4 +1,5 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { buildAdArtPrompt } from "@/lib/ad-prompt";
 import type { AdCategory, AdStyle, GeneratedAdCopy, PublishTarget } from "@/lib/types";
 import {
   categoryLabels,
@@ -7,11 +8,11 @@ import {
 } from "@/lib/ad-styles";
 
 const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL ?? "gemini-3.6-flash";
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image";
 
 function getApiKey(): string {
   const apiKey =
-    process.env.GOOGLE_AI_API_KEY ??
-    process.env.GEMINI_API_KEY;
+    process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     throw new Error(
@@ -24,6 +25,145 @@ function getApiKey(): string {
 
 function getClient() {
   return new GoogleGenAI({ apiKey: getApiKey() });
+}
+
+export interface GeneratedAdImage {
+  base64: string;
+  mimeType: string;
+}
+
+export interface GeneratedAdResult {
+  feedImage?: GeneratedAdImage;
+  storiesImage?: GeneratedAdImage;
+  headline: string;
+  subheadline: string;
+  tagline: string;
+  cta: string;
+}
+
+function extractImageFromResponse(response: {
+  data?: string;
+  candidates?: Array<{
+    content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> };
+  }>;
+}): GeneratedAdImage | null {
+  if (response.data) {
+    const mimeType =
+      response.candidates?.[0]?.content?.parts?.find((part) => part.inlineData?.data)
+        ?.inlineData?.mimeType ?? "image/png";
+    return { base64: response.data, mimeType };
+  }
+
+  const parts = response.candidates?.[0]?.content?.parts ?? [];
+  for (const part of parts) {
+    if (part.inlineData?.data) {
+      return {
+        base64: part.inlineData.data,
+        mimeType: part.inlineData.mimeType ?? "image/png",
+      };
+    }
+  }
+
+  return null;
+}
+
+async function generateAdArtworkVariant(input: {
+  photoBase64: string;
+  photoMimeType: string;
+  mainMessage: string;
+  adCategory: AdCategory;
+  adStyle: AdStyle;
+  publishTarget: PublishTarget;
+  aspectRatio: "4:5" | "9:16";
+}): Promise<GeneratedAdImage> {
+  const ai = getClient();
+  const prompt = buildAdArtPrompt({
+    mainMessage: input.mainMessage,
+    adCategory: input.adCategory,
+    adStyle: input.adStyle,
+    publishTarget: input.publishTarget,
+    aspectRatio: input.aspectRatio,
+  });
+
+  const response = await ai.models.generateContent({
+    model: IMAGE_MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: input.photoMimeType,
+              data: input.photoBase64,
+            },
+          },
+          { text: prompt },
+        ],
+      },
+    ],
+    config: {
+      responseModalities: [Modality.TEXT, Modality.IMAGE],
+      imageConfig: {
+        aspectRatio: input.aspectRatio,
+        imageSize: "1K",
+      },
+    },
+  });
+
+  const image = extractImageFromResponse(response);
+  if (!image) {
+    const text = response.text?.trim();
+    throw new Error(
+      text
+        ? `Gemini não retornou imagem: ${text}`
+        : "Gemini não retornou a arte gerada. Tente novamente.",
+    );
+  }
+
+  return image;
+}
+
+export async function generateAdArtworks(input: {
+  photoBase64: string;
+  photoMimeType: string;
+  mainMessage: string;
+  adStyle: AdStyle;
+  adCategory: AdCategory;
+  publishTarget: PublishTarget;
+}): Promise<GeneratedAdResult> {
+  const result: GeneratedAdResult = {
+    headline: input.mainMessage,
+    subheadline: "",
+    tagline: "Qualidade premium para você",
+    cta:
+      input.adCategory === "servico"
+        ? "Chame no WhatsApp"
+        : input.adCategory === "promocao"
+          ? "Peça o seu agora"
+          : "Envie uma mensagem",
+  };
+
+  const tasks: Array<Promise<void>> = [];
+
+  if (input.publishTarget === "feed" || input.publishTarget === "both") {
+    tasks.push(
+      generateAdArtworkVariant({ ...input, aspectRatio: "4:5" }).then((image) => {
+        result.feedImage = image;
+      }),
+    );
+  }
+
+  if (input.publishTarget === "stories" || input.publishTarget === "both") {
+    tasks.push(
+      generateAdArtworkVariant({ ...input, aspectRatio: "9:16" }).then((image) => {
+        result.storiesImage = image;
+      }),
+    );
+  }
+
+  await Promise.all(tasks);
+
+  return result;
 }
 
 export async function suggestAdMessage(input: {

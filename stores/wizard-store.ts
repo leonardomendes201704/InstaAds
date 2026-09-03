@@ -1,7 +1,7 @@
 "use client";
 
-import { composeAdImages } from "@/lib/ad-composer";
-import type { GeneratedAd, GeneratedAdCopy } from "@/lib/types";
+import { base64ToBlobUrl, preparePhotoForApi } from "@/lib/image-utils";
+import type { GeneratedAd } from "@/lib/types";
 import { create } from "zustand";
 import type {
   AdCategory,
@@ -52,6 +52,13 @@ const initialState = {
   isGenerating: false,
   isSuggesting: false,
   error: null,
+};
+
+const defaultLayout = {
+  textAlign: "left" as const,
+  overlayOpacity: 0.35,
+  accentColor: "#FF0066",
+  fontWeight: "bold" as const,
 };
 
 function revokeGeneratedAd(ad: GeneratedAd | null) {
@@ -117,7 +124,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
 
   generateAd: async () => {
     const {
-      photoPreviewUrl,
+      photo,
       mainMessage,
       adStyle,
       adCategory,
@@ -125,11 +132,13 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       generatedAd,
     } = get();
 
-    if (!photoPreviewUrl || !mainMessage.trim()) return;
+    if (!photo || !mainMessage.trim()) return;
 
     set({ isGenerating: true, error: null });
 
     try {
+      const prepared = await preparePhotoForApi(photo);
+
       const response = await fetch("/api/generate-ad", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -138,22 +147,41 @@ export const useWizardStore = create<WizardState>((set, get) => ({
           adStyle,
           adCategory,
           publishTarget,
+          photoBase64: prepared.base64,
+          photoMimeType: prepared.mimeType,
         }),
       });
 
-      const copy = (await response.json()) as GeneratedAdCopy & { error?: string };
-      if (!response.ok) throw new Error(copy.error ?? "Erro ao gerar anúncio.");
+      const data = (await response.json()) as {
+        feedImage?: { base64: string; mimeType: string };
+        storiesImage?: { base64: string; mimeType: string };
+        headline?: string;
+        subheadline?: string;
+        tagline?: string;
+        cta?: string;
+        error?: string;
+      };
+
+      if (!response.ok) throw new Error(data.error ?? "Erro ao gerar anúncio.");
 
       revokeGeneratedAd(generatedAd);
-      const blobs = await composeAdImages(
-        photoPreviewUrl,
-        copy,
-        adStyle,
-        publishTarget,
-      );
+
+      const nextAd: GeneratedAd = {
+        headline: data.headline ?? mainMessage,
+        subheadline: data.subheadline ?? "",
+        tagline: data.tagline ?? "",
+        cta: data.cta ?? "Envie uma mensagem",
+        layout: defaultLayout,
+        feedBlobUrl: data.feedImage
+          ? base64ToBlobUrl(data.feedImage.base64, data.feedImage.mimeType)
+          : undefined,
+        storiesBlobUrl: data.storiesImage
+          ? base64ToBlobUrl(data.storiesImage.base64, data.storiesImage.mimeType)
+          : undefined,
+      };
 
       set({
-        generatedAd: { ...copy, ...blobs },
+        generatedAd: nextAd,
         step: 3,
       });
     } catch (error) {

@@ -67,7 +67,9 @@ export function Step2Personalize() {
 
   return (
     <>
-      {isGenerating ? <LoadingOverlay /> : null}
+      {isGenerating ? (
+        <LoadingOverlay message="A IA está criando sua arte publicitária..." />
+      ) : null}
       <WizardShell
       step={2}
       title="Personalize seu anúncio"
