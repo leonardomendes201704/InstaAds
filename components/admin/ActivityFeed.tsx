@@ -37,9 +37,14 @@ function eventDescription(event: ActivityEvent): string {
 interface ActivityFeedProps {
   events: ActivityEvent[];
   compact?: boolean;
+  className?: string;
 }
 
-export function ActivityFeed({ events, compact = false }: ActivityFeedProps) {
+export function ActivityFeed({
+  events,
+  compact = false,
+  className,
+}: ActivityFeedProps) {
   if (events.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-black/15 bg-white px-6 py-12 text-center">
@@ -49,7 +54,9 @@ export function ActivityFeed({ events, compact = false }: ActivityFeedProps) {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-black/10 bg-white">
+    <div
+      className={`overflow-hidden rounded-2xl border border-black/10 bg-white ${className ?? ""}`}
+    >
       <ul className="divide-y divide-black/10">
         {events.map((event) => (
           <li

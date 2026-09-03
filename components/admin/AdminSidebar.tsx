@@ -28,13 +28,13 @@ export function AdminSidebar() {
   }
 
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-black/10 bg-white">
-      <div className="border-b border-black/10 px-5 py-6">
+    <aside className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-r border-black/10 bg-white">
+      <div className="shrink-0 border-b border-black/10 px-5 py-6">
         <p className="text-lg font-semibold text-foreground">InstaAds Admin</p>
         <p className="mt-1 text-xs text-muted">Painel de gestão</p>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-4">
         {navItems.map(({ href, label, icon: Icon, exact }) => {
           const active = exact
             ? pathname === href
@@ -57,7 +57,7 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="border-t border-black/10 p-3">
+      <div className="shrink-0 border-t border-black/10 p-3">
         <button
           type="button"
           onClick={() => void handleLogout()}

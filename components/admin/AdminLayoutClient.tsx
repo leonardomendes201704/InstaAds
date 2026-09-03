@@ -24,9 +24,11 @@ export function AdminLayoutClient({
   }
 
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex h-full min-h-0 overflow-hidden">
       <AdminSidebar />
-      <main className="flex-1 overflow-y-auto">{children}</main>
+      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {children}
+      </main>
     </div>
   );
 }

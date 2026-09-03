@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ActivityEvent } from "@/lib/db/types";
 import { AdminStatsBar } from "@/components/admin/AdminStatsBar";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
@@ -12,8 +12,9 @@ export function AdminOverview() {
   const [events, setEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const didAutoBackfill = useRef(false);
 
-  const load = useCallback(async () => {
+  async function loadDashboard() {
     setLoading(true);
     setError(null);
 
@@ -27,7 +28,7 @@ export function AdminOverview() {
         stats?: DashboardStats;
         error?: string;
       };
-      const activityData = (await activityRes.json()) as {
+      let activityData = (await activityRes.json()) as {
         events?: ActivityEvent[];
         error?: string;
       };
@@ -36,20 +37,34 @@ export function AdminOverview() {
         throw new Error(statsData.error ?? "Erro ao carregar estatísticas.");
       }
 
-      setStats(statsData.stats ?? null);
-      setEvents(activityData.events ?? []);
+      const nextStats = statsData.stats ?? null;
+      let nextEvents = activityData.events ?? [];
+
+      if (
+        nextEvents.length === 0 &&
+        (nextStats?.totalGenerations ?? 0) > 0 &&
+        !didAutoBackfill.current
+      ) {
+        didAutoBackfill.current = true;
+        await fetch("/api/admin/backfill-activity", { method: "POST" });
+        const refreshed = await fetch("/api/admin/activity?limit=10");
+        activityData = (await refreshed.json()) as typeof activityData;
+        nextEvents = activityData.events ?? [];
+      }
+
+      setStats(nextStats);
+      setEvents(nextEvents);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dashboard.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
-    // Data fetch on mount / filter change
     // eslint-disable-next-line react-hooks/set-state-in-effect -- admin client fetch
-    void load();
-  }, [load]);
+    void loadDashboard();
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -71,14 +86,14 @@ export function AdminOverview() {
       ) : stats ? (
         <div className="space-y-8">
           {stats.totalGenerations === 0 ? (
-            <MigrateBlobPanel onComplete={() => void load()} />
+            <MigrateBlobPanel onComplete={() => void loadDashboard()} />
           ) : null}
           <AdminStatsBar stats={stats} />
           <div>
             <h2 className="mb-4 text-lg font-semibold text-foreground">
               Atividade recente
             </h2>
-            <ActivityFeed events={events} compact />
+            <ActivityFeed events={events} compact className="max-h-80 overflow-y-auto" />
           </div>
         </div>
       ) : null}

@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const authenticated = await isAdminAuthenticated();
 
   return (
-    <div className="h-dvh overflow-hidden bg-surface text-foreground">
+    <div className="flex h-dvh flex-col overflow-hidden bg-surface text-foreground">
       <AdminLayoutClient authenticated={authenticated}>
         {children}
       </AdminLayoutClient>
