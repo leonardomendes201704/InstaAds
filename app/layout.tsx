@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "InstaAds",
   },
+  verification: {
+    google: "FQB_1RXC6KCQebUWM5weXDxPMwtqeMQdPkC-PB-GG70",
+  },
 };
 
 export const viewport: Viewport = {
