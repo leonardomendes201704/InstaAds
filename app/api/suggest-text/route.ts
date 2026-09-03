@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
-import { suggestAdMessage } from "@/lib/openai";
+import { suggestAdMessage } from "@/lib/gemini";
 
 export async function POST(request: Request) {
   try {
