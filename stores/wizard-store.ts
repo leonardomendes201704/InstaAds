@@ -45,7 +45,7 @@ const initialState = {
   photo: null,
   photoPreviewUrl: null,
   adCategory: "produto" as AdCategory,
-  publishTarget: "both" as PublishTarget,
+  publishTarget: "feed" as PublishTarget,
   adStyle: "moderno" as AdStyle,
   mainMessage: "",
   generatedAd: null,
@@ -132,7 +132,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       generatedAd,
     } = get();
 
-    if (!photo || !mainMessage.trim()) return;
+    if (!photo) return;
 
     set({ isGenerating: true, error: null });
 
@@ -168,7 +168,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
       revokeGeneratedAd(generatedAd);
 
       const nextAd: GeneratedAd = {
-        headline: data.headline ?? mainMessage,
+        headline: data.headline ?? (mainMessage.trim() || "Destaque imperdível"),
         subheadline: data.subheadline ?? "",
         tagline: data.tagline ?? "",
         benefits: data.benefits,

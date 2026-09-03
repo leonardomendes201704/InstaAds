@@ -118,7 +118,7 @@ REGRAS OBRIGATÓRIAS:
 - cta: máximo 25 caracteres, ação clara (ex: "Envie uma mensagem")
 
 Contexto:
-- Mensagem do anunciante: "${input.mainMessage}"
+- Mensagem do anunciante: ${input.mainMessage.trim() ? `"${input.mainMessage.trim()}"` : "não informada — analise o produto na foto e crie a copy ideal automaticamente"}
 - Categoria: ${categoryLabels[input.adCategory]}
 - Estilo: ${styleLabels[input.adStyle]}
 - Canal: ${publishLabels[input.publishTarget]}
@@ -142,7 +142,7 @@ Contexto:
   const parsed = JSON.parse(raw) as AdArtworkCopy;
 
   return {
-    headline: parsed.headline?.trim() || input.mainMessage.toUpperCase(),
+    headline: parsed.headline?.trim() || (input.mainMessage.trim() ? input.mainMessage.toUpperCase() : "DESTAQUE IMPERDÍVEL"),
     subheadline: parsed.subheadline?.trim() || "",
     benefits: normalizeBenefits(parsed.benefits),
     cta: parsed.cta?.trim() || defaultCta[input.adCategory],
