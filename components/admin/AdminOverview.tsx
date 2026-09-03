@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ActivityEvent } from "@/lib/db/types";
 import { AdminStatsBar } from "@/components/admin/AdminStatsBar";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
+import { MigrateBlobPanel } from "@/components/admin/MigrateBlobPanel";
 import type { DashboardStats } from "@/lib/db/types";
 
 export function AdminOverview() {
@@ -69,6 +70,9 @@ export function AdminOverview() {
         </div>
       ) : stats ? (
         <div className="space-y-8">
+          {stats.totalGenerations === 0 ? (
+            <MigrateBlobPanel onComplete={() => void load()} />
+          ) : null}
           <AdminStatsBar stats={stats} />
           <div>
             <h2 className="mb-4 text-lg font-semibold text-foreground">
