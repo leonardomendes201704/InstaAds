@@ -22,6 +22,13 @@ export interface StoredGeneration {
   aiCost?: AiCostEstimate;
 }
 
+export interface AdminStats {
+  totalGenerations: number;
+  uniqueSessions: number;
+  totalCostUsd: number;
+  generationsToday: number;
+}
+
 const blobAccess = (process.env.BLOB_ACCESS ?? "private") as "public" | "private";
 
 const putOptions = {
@@ -135,6 +142,88 @@ async function readPrivateJson(pathname: string): Promise<StoredGeneration | nul
   } catch {
     return null;
   }
+}
+
+export function pathnameFromBlobUrl(url: string): string | null {
+  try {
+    const pathname = new URL(url).pathname;
+    return pathname.startsWith("/") ? pathname.slice(1) : pathname;
+  } catch {
+    return null;
+  }
+}
+
+export function isValidGenerationPath(path: string): boolean {
+  if (!path.startsWith("generations/")) return false;
+  if (path.includes("..")) return false;
+  return true;
+}
+
+export async function getPrivateBlob(pathname: string) {
+  return get(pathname, { access: blobAccess });
+}
+
+export function computeAdminStats(generations: StoredGeneration[]): AdminStats {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const sessions = new Set(generations.map((g) => g.sessionId));
+
+  return {
+    totalGenerations: generations.length,
+    uniqueSessions: sessions.size,
+    totalCostUsd: generations.reduce(
+      (sum, g) => sum + (g.aiCost?.totalUsd ?? 0),
+      0,
+    ),
+    generationsToday: generations.filter(
+      (g) => new Date(g.createdAt) >= todayStart,
+    ).length,
+  };
+}
+
+export async function listAllGenerations(options?: {
+  cursor?: string;
+  limit?: number;
+}): Promise<{
+  generations: StoredGeneration[];
+  cursor?: string;
+  hasMore: boolean;
+}> {
+  if (!isStorageConfigured()) {
+    return { generations: [], hasMore: false };
+  }
+
+  const pageSize = options?.limit ?? 20;
+  const { list } = await import("@vercel/blob");
+
+  const result = await list({
+    prefix: "generations/",
+    cursor: options?.cursor,
+    limit: 1000,
+  });
+
+  const metadataBlobs = result.blobs.filter((blob) =>
+    blob.pathname.endsWith("/metadata.json"),
+  );
+
+  const records = await Promise.all(
+    metadataBlobs.map((blob) => readPrivateJson(blob.pathname)),
+  );
+
+  const generations = records
+    .filter((record): record is StoredGeneration => record !== null)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, pageSize);
+
+  return {
+    generations,
+    cursor: result.cursor,
+    hasMore: Boolean(result.hasMore && result.cursor),
+  };
 }
 
 export async function listGenerationsBySession(
