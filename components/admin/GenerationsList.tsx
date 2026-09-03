@@ -1,5 +1,7 @@
 import type { StoredGeneration } from "@/lib/db/types";
-import { getGenerationOwnerLabel, pathnameFromBlobUrl } from "@/lib/storage";
+import { getGenerationOwnerLabel } from "@/lib/storage";
+import { generationMediaUrl } from "@/lib/admin/generation-media";
+import { GenerationImagesGallery } from "@/components/admin/GenerationImagesGallery";
 import { categoryLabels, publishLabels } from "@/lib/ad-styles";
 
 function formatDate(iso: string): string {
@@ -27,50 +29,6 @@ function formatUsd(value: number): string {
     minimumFractionDigits: 3,
     maximumFractionDigits: 4,
   }).format(value);
-}
-
-function mediaUrl(storagePath?: string): string | undefined {
-  if (!storagePath) return undefined;
-
-  let path = storagePath;
-  if (storagePath.startsWith("http")) {
-    const extracted = pathnameFromBlobUrl(storagePath);
-    if (!extracted) return undefined;
-    path = extracted.startsWith("generations/")
-      ? extracted.slice("generations/".length)
-      : extracted;
-  }
-
-  return `/api/admin/media?path=${encodeURIComponent(path)}`;
-}
-
-function GenerationImages({ generation }: { generation: StoredGeneration }) {
-  const original = mediaUrl(generation.originalPhotoUrl);
-  const feed = mediaUrl(generation.generatedArtUrl);
-  const stories = mediaUrl(generation.generatedStoriesUrl);
-
-  return (
-    <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {original ? (
-        <figure className="overflow-hidden rounded-xl border border-black/10 bg-surface">
-          <img src={original} alt="Foto original" className="aspect-square w-full object-cover" />
-          <figcaption className="px-3 py-2 text-xs text-muted">Original</figcaption>
-        </figure>
-      ) : null}
-      {feed ? (
-        <figure className="overflow-hidden rounded-xl border border-black/10 bg-surface">
-          <img src={feed} alt="Arte feed" className="aspect-[4/5] w-full object-cover" />
-          <figcaption className="px-3 py-2 text-xs text-muted">Feed</figcaption>
-        </figure>
-      ) : null}
-      {stories ? (
-        <figure className="overflow-hidden rounded-xl border border-black/10 bg-surface">
-          <img src={stories} alt="Arte stories" className="aspect-[9/16] w-full object-cover" />
-          <figcaption className="px-3 py-2 text-xs text-muted">Stories</figcaption>
-        </figure>
-      ) : null}
-    </div>
-  );
 }
 
 function GenerationDetails({ generation }: { generation: StoredGeneration }) {
@@ -125,7 +83,7 @@ function GenerationDetails({ generation }: { generation: StoredGeneration }) {
         </div>
       ) : null}
 
-      <GenerationImages generation={generation} />
+      <GenerationImagesGallery generation={generation} />
     </div>
   );
 }
@@ -149,8 +107,8 @@ function Thumbnail({ src, label }: { src?: string; label: string }) {
 }
 
 function GenerationCard({ generation }: { generation: StoredGeneration }) {
-  const original = mediaUrl(generation.originalPhotoUrl);
-  const feed = mediaUrl(generation.generatedArtUrl);
+  const original = generationMediaUrl(generation.originalPhotoUrl);
+  const feed = generationMediaUrl(generation.generatedArtUrl);
 
   return (
     <details className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
@@ -179,8 +137,8 @@ function GenerationCard({ generation }: { generation: StoredGeneration }) {
 }
 
 function GenerationRow({ generation }: { generation: StoredGeneration }) {
-  const original = mediaUrl(generation.originalPhotoUrl);
-  const feed = mediaUrl(generation.generatedArtUrl);
+  const original = generationMediaUrl(generation.originalPhotoUrl);
+  const feed = generationMediaUrl(generation.generatedArtUrl);
 
   return (
     <details className="group border-b border-black/10 bg-white">
