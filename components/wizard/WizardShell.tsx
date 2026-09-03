@@ -3,6 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import { ProgressDots } from "@/components/ui/ProgressDots";
 import { UserAccountButton } from "@/components/auth/UserAccountButton";
+import { UsageBadge } from "@/components/billing/UsageBadge";
 import { LogoIcon } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 
@@ -54,6 +55,7 @@ export function WizardShell({
         </div>
 
         <div className="pb-3 pt-1 text-center">
+          <UsageBadge />
           <h1 className="text-2xl font-bold leading-tight text-foreground">
             {title}
           </h1>

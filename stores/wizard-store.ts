@@ -22,6 +22,7 @@ interface WizardState {
   isGenerating: boolean;
   isSuggesting: boolean;
   error: string | null;
+  quotaExceeded: boolean;
 
   setStep: (step: WizardStep) => void;
   nextStep: () => void;
@@ -35,6 +36,7 @@ interface WizardState {
   setIsGenerating: (value: boolean) => void;
   setIsSuggesting: (value: boolean) => void;
   setError: (error: string | null) => void;
+  setQuotaExceeded: (value: boolean) => void;
   suggestText: () => Promise<void>;
   generateAd: () => Promise<void>;
   reset: () => void;
@@ -52,6 +54,7 @@ const initialState = {
   isGenerating: false,
   isSuggesting: false,
   error: null,
+  quotaExceeded: false,
 };
 
 const defaultLayout = {
@@ -97,11 +100,13 @@ export const useWizardStore = create<WizardState>((set, get) => ({
   setGeneratedAd: (generatedAd) => set({ generatedAd }),
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setIsSuggesting: (isSuggesting) => set({ isSuggesting }),
-  setError: (error) => set({ error }),
+  setError: (error) =>
+    set(error ? { error } : { error: null, quotaExceeded: false }),
+  setQuotaExceeded: (quotaExceeded) => set({ quotaExceeded }),
 
   suggestText: async () => {
     const { adStyle, adCategory, publishTarget } = get();
-    set({ isSuggesting: true, error: null });
+    set({ isSuggesting: true, error: null, quotaExceeded: false });
 
     try {
       const response = await fetch("/api/suggest-text", {
@@ -134,7 +139,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
 
     if (!photo) return;
 
-    set({ isGenerating: true, error: null });
+    set({ isGenerating: true, error: null, quotaExceeded: false });
 
     try {
       const prepared = await preparePhotoForApi(photo);
@@ -163,9 +168,23 @@ export const useWizardStore = create<WizardState>((set, get) => ({
         stored?: boolean;
         storageError?: string;
         error?: string;
+        code?: string;
+        usage?: number;
+        limit?: number;
       };
 
-      if (!response.ok) throw new Error(data.error ?? "Erro ao gerar anúncio.");
+      if (!response.ok) {
+        if (response.status === 402 && data.code === "QUOTA_EXCEEDED") {
+          set({
+            quotaExceeded: true,
+            error:
+              data.error ??
+              `Limite mensal atingido (${data.usage ?? "?"}/${data.limit ?? "?"}).`,
+          });
+          return;
+        }
+        throw new Error(data.error ?? "Erro ao gerar anúncio.");
+      }
 
       if (data.stored === false && data.storageError) {
         console.warn("[InstaAds] Storage:", data.storageError);

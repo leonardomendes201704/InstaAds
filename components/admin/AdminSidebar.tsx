@@ -4,9 +4,13 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Activity,
+  CreditCard,
   ImageIcon,
   LayoutDashboard,
   LogOut,
+  Mail,
+  Settings,
+  Tag,
   Users,
 } from "lucide-react";
 
@@ -15,6 +19,10 @@ const navItems = [
   { href: "/admin/users", label: "Usuários", icon: Users },
   { href: "/admin/generations", label: "Gerações", icon: ImageIcon },
   { href: "/admin/activity", label: "Atividades", icon: Activity },
+  { href: "/admin/plans", label: "Planos", icon: CreditCard },
+  { href: "/admin/promotions", label: "Promoções", icon: Tag },
+  { href: "/admin/emails", label: "E-mails", icon: Mail },
+  { href: "/admin/settings", label: "Configurações", icon: Settings },
 ];
 
 export function AdminSidebar() {

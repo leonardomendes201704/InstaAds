@@ -5,7 +5,8 @@
  *
  * Pré-requisitos:
  * 1. Rodar supabase/migrations/001_initial.sql no SQL Editor do Supabase
- * 2. Definir no .env.local:
+ * 2. Rodar supabase/migrations/002_billing.sql (planos, billing, settings)
+ * 3. Definir no .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
  *    SUPABASE_SERVICE_ROLE_KEY=eyJ... (Settings → API → service_role)
  *
@@ -73,6 +74,16 @@ async function main() {
   }
 
   console.log("✓ Postgres OK (tabela profiles existe)");
+
+  const { error: plansError } = await supabase.from("plans").select("id").limit(1);
+
+  if (plansError) {
+    console.warn("\n⚠ Tabela 'plans' não encontrada.");
+    console.warn("  Rode supabase/migrations/002_billing.sql no SQL Editor");
+    console.warn("  para habilitar planos, limites e billing.\n");
+  } else {
+    console.log("✓ Billing OK (tabela plans existe)");
+  }
 
   const { data: buckets, error: listError } =
     await supabase.storage.listBuckets();

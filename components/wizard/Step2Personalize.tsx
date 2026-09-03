@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Diamond, Sparkles, Square, Tag } from "lucide-react";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { InfoBanner } from "@/components/ui/InfoBanner";
@@ -33,6 +34,7 @@ export function Step2Personalize() {
     isGenerating,
     isSuggesting,
     error,
+    quotaExceeded,
     setAdStyle,
     setMainMessage,
     setStep,
@@ -132,9 +134,17 @@ export function Step2Personalize() {
           </InfoBanner>
 
           {error ? (
-            <p className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
-              {error}
-            </p>
+            <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
+              <p>{error}</p>
+              {quotaExceeded ? (
+                <Link
+                  href="/planos"
+                  className="mt-1 inline-block font-medium text-accent-purple underline"
+                >
+                  Ver planos e fazer upgrade
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </WizardShell>

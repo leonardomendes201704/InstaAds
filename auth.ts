@@ -1,7 +1,9 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { logActivity } from "@/lib/db/activity";
+import { ensureUserDefaultPlan } from "@/lib/db/plans";
 import { getProfile, upsertProfile } from "@/lib/db/profiles";
+import { sendWelcomeEmail } from "@/lib/email/send";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -22,6 +24,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return false;
         }
 
+        const isNewUser = !existing;
+
         await upsertProfile({
           id: user.id,
           email: user.email,
@@ -29,11 +33,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           image: user.image,
         });
 
+        await ensureUserDefaultPlan(user.id);
+
         await logActivity({
           userId: user.id,
           type: "user.sign_in",
           metadata: { email: user.email },
         });
+
+        if (isNewUser && user.email) {
+          void sendWelcomeEmail({
+            userId: user.id,
+            email: user.email,
+            name: user.name ?? undefined,
+          });
+        }
       }
 
       return true;

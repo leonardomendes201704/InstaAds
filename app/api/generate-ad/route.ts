@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { logActivity } from "@/lib/db/activity";
+import {
+  assertCanGenerate,
+  incrementGenerationUsage,
+  QuotaExceededError,
+} from "@/lib/billing/usage";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
+import { sendQuotaReachedEmail } from "@/lib/email/send";
 import { generateAdArtworks } from "@/lib/gemini";
 import { isStorageConfigured, saveGeneration } from "@/lib/storage";
 import { requireCurrentUser, UserBlockedError } from "@/lib/user";
@@ -10,10 +16,14 @@ export const maxDuration = 120;
 export async function POST(request: Request) {
   let userId: string | undefined;
   let generationId: string | undefined;
+  let userEmail: string | undefined;
 
   try {
     const user = await requireCurrentUser();
     userId = user.id;
+    userEmail = user.email;
+
+    await assertCanGenerate(user.id);
 
     const body = (await request.json()) as {
       mainMessage: string;
@@ -41,6 +51,8 @@ export async function POST(request: Request) {
       adCategory: body.adCategory,
       publishTarget: body.publishTarget,
     });
+
+    await incrementGenerationUsage(user.id);
 
     let stored = false;
     let storageError: string | undefined;
@@ -100,6 +112,28 @@ export async function POST(request: Request) {
 
     if (error instanceof UserBlockedError) {
       return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
+    if (error instanceof QuotaExceededError) {
+      if (userId && userEmail) {
+        void sendQuotaReachedEmail({
+          userId,
+          email: userEmail,
+          planName: error.plan.name,
+          limit: error.limit,
+        });
+      }
+
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: "QUOTA_EXCEEDED",
+          usage: error.usage,
+          limit: error.limit,
+          planSlug: error.plan.slug,
+        },
+        { status: 402 },
+      );
     }
 
     const message =
