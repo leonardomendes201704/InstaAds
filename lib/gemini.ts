@@ -1,4 +1,11 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
+import {
+  buildAiCostEstimate,
+  estimateCallCost,
+  extractUsageMetadata,
+  type AiCostEstimate,
+  type AiUsageCall,
+} from "@/lib/ai-cost";
 import { buildAdArtPrompt } from "@/lib/ad-prompt";
 import type {
   AdArtworkCopy,
@@ -46,6 +53,7 @@ export interface GeneratedAdResult {
   tagline: string;
   benefits: [string, string, string];
   cta: string;
+  aiCost: AiCostEstimate;
 }
 
 const artworkCopySchema = {
@@ -82,14 +90,14 @@ function normalizeBenefits(benefits: string[] | undefined): [string, string, str
   return [items[0], items[1], items[2]];
 }
 
-export async function generateAdArtworkCopy(input: {
+async function generateAdArtworkCopy(input: {
   photoBase64: string;
   photoMimeType: string;
   mainMessage: string;
   adStyle: AdStyle;
   adCategory: AdCategory;
   publishTarget: PublishTarget;
-}): Promise<AdArtworkCopy> {
+}): Promise<{ copy: AdArtworkCopy; usage: AiUsageCall }> {
   const ai = getClient();
 
   const response = await ai.models.generateContent({
@@ -142,10 +150,21 @@ Contexto:
   const parsed = JSON.parse(raw) as AdArtworkCopy;
 
   return {
-    headline: parsed.headline?.trim() || (input.mainMessage.trim() ? input.mainMessage.toUpperCase() : "DESTAQUE IMPERDÍVEL"),
-    subheadline: parsed.subheadline?.trim() || "",
-    benefits: normalizeBenefits(parsed.benefits),
-    cta: parsed.cta?.trim() || defaultCta[input.adCategory],
+    copy: {
+      headline:
+        parsed.headline?.trim() ||
+        (input.mainMessage.trim()
+          ? input.mainMessage.toUpperCase()
+          : "DESTAQUE IMPERDÍVEL"),
+      subheadline: parsed.subheadline?.trim() || "",
+      benefits: normalizeBenefits(parsed.benefits),
+      cta: parsed.cta?.trim() || defaultCta[input.adCategory],
+    },
+    usage: estimateCallCost({
+      model: TEXT_MODEL,
+      purpose: "copy",
+      usage: extractUsageMetadata(response),
+    }),
   };
 }
 
@@ -183,7 +202,8 @@ async function generateAdArtworkVariant(input: {
   adStyle: AdStyle;
   publishTarget: PublishTarget;
   aspectRatio: "4:5" | "9:16";
-}): Promise<GeneratedAdImage> {
+  purpose: "feed-image" | "stories-image";
+}): Promise<{ image: GeneratedAdImage; usage: AiUsageCall }> {
   const ai = getClient();
   const prompt = buildAdArtPrompt({
     copy: input.copy,
@@ -228,7 +248,14 @@ async function generateAdArtworkVariant(input: {
     );
   }
 
-  return image;
+  return {
+    image,
+    usage: estimateCallCost({
+      model: IMAGE_MODEL,
+      purpose: input.purpose,
+      usage: extractUsageMetadata(response),
+    }),
+  };
 }
 
 export async function generateAdArtworks(input: {
@@ -239,7 +266,8 @@ export async function generateAdArtworks(input: {
   adCategory: AdCategory;
   publishTarget: PublishTarget;
 }): Promise<GeneratedAdResult> {
-  const copy = await generateAdArtworkCopy(input);
+  const { copy, usage: copyUsage } = await generateAdArtworkCopy(input);
+  const usageCalls: AiUsageCall[] = [copyUsage];
 
   const result: GeneratedAdResult = {
     headline: copy.headline,
@@ -247,6 +275,7 @@ export async function generateAdArtworks(input: {
     tagline: copy.benefits.join(" • "),
     benefits: copy.benefits,
     cta: copy.cta,
+    aiCost: buildAiCostEstimate(usageCalls),
   };
 
   const tasks: Array<Promise<void>> = [];
@@ -257,8 +286,10 @@ export async function generateAdArtworks(input: {
         ...input,
         copy,
         aspectRatio: "4:5",
-      }).then((image) => {
+        purpose: "feed-image",
+      }).then(({ image, usage }) => {
         result.feedImage = image;
+        usageCalls.push(usage);
       }),
     );
   }
@@ -269,13 +300,16 @@ export async function generateAdArtworks(input: {
         ...input,
         copy,
         aspectRatio: "9:16",
-      }).then((image) => {
+        purpose: "stories-image",
+      }).then(({ image, usage }) => {
         result.storiesImage = image;
+        usageCalls.push(usage);
       }),
     );
   }
 
   await Promise.all(tasks);
+  result.aiCost = buildAiCostEstimate(usageCalls);
 
   return result;
 }

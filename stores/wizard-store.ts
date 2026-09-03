@@ -160,10 +160,16 @@ export const useWizardStore = create<WizardState>((set, get) => ({
         tagline?: string;
         benefits?: [string, string, string];
         cta?: string;
+        stored?: boolean;
+        storageError?: string;
         error?: string;
       };
 
       if (!response.ok) throw new Error(data.error ?? "Erro ao gerar anúncio.");
+
+      if (data.stored === false && data.storageError) {
+        console.warn("[InstaAds] Storage:", data.storageError);
+      }
 
       revokeGeneratedAd(generatedAd);
 

@@ -1,4 +1,5 @@
 import { get, put, type PutCommandOptions } from "@vercel/blob";
+import type { AiCostEstimate } from "@/lib/ai-cost";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 
 export interface StoredGeneration {
@@ -18,6 +19,7 @@ export interface StoredGeneration {
   generatedArtUrl?: string;
   generatedStoriesUrl?: string;
   errorMessage?: string;
+  aiCost?: AiCostEstimate;
 }
 
 const blobAccess = (process.env.BLOB_ACCESS ?? "private") as "public" | "private";
@@ -28,7 +30,9 @@ const putOptions = {
 } satisfies Pick<PutCommandOptions, "access" | "addRandomSuffix">;
 
 export function isStorageConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  return Boolean(
+    process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID,
+  );
 }
 
 function basePath(sessionId: string, generationId: string) {
@@ -72,7 +76,9 @@ export async function saveGeneration(input: {
   >;
 }): Promise<StoredGeneration> {
   if (!isStorageConfigured()) {
-    throw new Error("BLOB_READ_WRITE_TOKEN não configurado.");
+    throw new Error(
+      "Vercel Blob não configurado (BLOB_STORE_ID ou BLOB_READ_WRITE_TOKEN).",
+    );
   }
 
   const prefix = basePath(input.sessionId, input.generationId);

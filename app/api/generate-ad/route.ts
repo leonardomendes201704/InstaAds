@@ -58,6 +58,7 @@ export async function POST(request: Request) {
             subheadline: result.subheadline,
             benefits: result.benefits,
             cta: result.cta,
+            aiCost: result.aiCost,
           },
         });
         stored = true;
@@ -67,7 +68,7 @@ export async function POST(request: Request) {
         console.error("Falha ao salvar geração no Blob:", error);
       }
     } else {
-      storageError = "BLOB_READ_WRITE_TOKEN não configurado.";
+      storageError = "Vercel Blob não configurado (BLOB_STORE_ID ou BLOB_READ_WRITE_TOKEN).";
     }
 
     const response = NextResponse.json({
