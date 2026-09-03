@@ -1,5 +1,5 @@
 import type { StoredGeneration } from "@/lib/storage";
-import { pathnameFromBlobUrl } from "@/lib/storage";
+import { getGenerationOwnerLabel, pathnameFromBlobUrl } from "@/lib/storage";
 import { categoryLabels, publishLabels } from "@/lib/ad-styles";
 
 function formatDate(iso: string): string {
@@ -9,9 +9,15 @@ function formatDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-function truncateSession(sessionId: string): string {
-  if (sessionId.length <= 12) return sessionId;
-  return `${sessionId.slice(0, 4)}…${sessionId.slice(-4)}`;
+function truncateUserId(userId: string): string {
+  if (userId.length <= 12) return userId;
+  return `${userId.slice(0, 4)}…${userId.slice(-4)}`;
+}
+
+function formatOwnerLabel(generation: StoredGeneration): string {
+  const label = getGenerationOwnerLabel(generation);
+  if (generation.userEmail) return label;
+  return truncateUserId(label);
 }
 
 function formatUsd(value: number): string {
@@ -64,8 +70,10 @@ function GenerationDetails({ generation }: { generation: StoredGeneration }) {
     <div className="mt-4 space-y-3 border-t border-black/10 pt-4 text-sm">
       <div className="grid gap-2 sm:grid-cols-2">
         <p>
-          <span className="font-medium text-foreground">Sessão:</span>{" "}
-          <span className="font-mono text-xs text-muted">{generation.sessionId}</span>
+          <span className="font-medium text-foreground">Usuário:</span>{" "}
+          <span className="font-mono text-xs text-muted">
+            {getGenerationOwnerLabel(generation)}
+          </span>
         </p>
         <p>
           <span className="font-medium text-foreground">ID:</span>{" "}
@@ -145,7 +153,7 @@ function GenerationCard({ generation }: { generation: StoredGeneration }) {
             <p className="mt-1 text-xs text-muted">{formatDate(generation.createdAt)}</p>
             <p className="mt-1 text-xs text-muted">
               {categoryLabels[generation.adCategory]} · {generation.adStyle} ·{" "}
-              {truncateSession(generation.sessionId)}
+              {formatOwnerLabel(generation)}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -171,8 +179,8 @@ function GenerationRow({ generation }: { generation: StoredGeneration }) {
       <summary className="cursor-pointer list-none px-4 py-3 hover:bg-surface [&::-webkit-details-marker]:hidden">
         <div className="grid grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr_1.4fr_0.6fr_88px] items-center gap-3 text-sm">
           <span className="text-muted">{formatDate(generation.createdAt)}</span>
-          <span className="font-mono text-xs text-muted" title={generation.sessionId}>
-            {truncateSession(generation.sessionId)}
+          <span className="font-mono text-xs text-muted" title={getGenerationOwnerLabel(generation)}>
+            {formatOwnerLabel(generation)}
           </span>
           <span className="capitalize">{categoryLabels[generation.adCategory]}</span>
           <span className="capitalize">{generation.adStyle}</span>
@@ -211,7 +219,7 @@ export function GenerationsList({ generations }: GenerationsListProps) {
       <div className="hidden overflow-hidden rounded-2xl border border-black/10 md:block">
         <div className="grid grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr_1.4fr_0.6fr_88px] gap-3 border-b border-black/10 bg-surface px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted">
           <span>Data</span>
-          <span>Sessão</span>
+          <span>Usuário</span>
           <span>Categoria</span>
           <span>Estilo</span>
           <span>Headline</span>

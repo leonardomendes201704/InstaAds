@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 import { generateAdArtworks } from "@/lib/gemini";
-import { attachSessionCookie, getOrCreateSessionId } from "@/lib/session";
 import { isStorageConfigured, saveGeneration } from "@/lib/storage";
+import { requireCurrentUser } from "@/lib/user";
 
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
   try {
+    const user = await requireCurrentUser();
+
     const body = (await request.json()) as {
       mainMessage: string;
       adStyle: AdStyle;
@@ -24,7 +26,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const { sessionId, isNew } = await getOrCreateSessionId();
     const generationId = crypto.randomUUID();
 
     const result = await generateAdArtworks({
@@ -42,7 +43,9 @@ export async function POST(request: Request) {
     if (isStorageConfigured()) {
       try {
         await saveGeneration({
-          sessionId,
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.name,
           generationId,
           photoBase64: body.photoBase64,
           photoMimeType: body.photoMimeType ?? "image/jpeg",
@@ -71,18 +74,16 @@ export async function POST(request: Request) {
       storageError = "Vercel Blob não configurado (BLOB_STORE_ID ou BLOB_READ_WRITE_TOKEN).";
     }
 
-    const response = NextResponse.json({
+    return NextResponse.json({
       ...result,
       generationId,
       stored,
       storageError,
     });
-
-    attachSessionCookie(response, sessionId, isNew);
-    return response;
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Erro ao gerar anúncio.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = message === "Não autorizado." ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

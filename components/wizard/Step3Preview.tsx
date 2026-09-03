@@ -74,9 +74,6 @@ export function Step3Preview() {
       title="Seu anúncio está pronto"
       subtitle="Revise a arte criada pela IA e escolha o que fazer agora."
       onBack={prevStep}
-      onClose={() => {
-        if (confirm("Deseja sair e recomeçar?")) reset();
-      }}
       footer={
         <>
           <InfoBanner>

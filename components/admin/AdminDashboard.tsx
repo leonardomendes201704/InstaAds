@@ -33,7 +33,7 @@ function computeMergedStats(generations: StoredGeneration[]): AdminStats {
 
   return {
     totalGenerations: generations.length,
-    uniqueSessions: new Set(generations.map((g) => g.sessionId)).size,
+    uniqueUsers: new Set(generations.map((g) => g.userId)).size,
     totalCostUsd: generations.reduce(
       (sum, g) => sum + (g.aiCost?.totalUsd ?? 0),
       0,
@@ -101,7 +101,7 @@ export function AdminDashboard() {
         <div>
           <h1 className="text-3xl font-semibold text-foreground">InstaAds Admin</h1>
           <p className="mt-1 text-sm text-muted">
-            Acompanhe gerações, sessões e custo estimado de IA.
+            Acompanhe gerações, usuários e custo estimado de IA.
           </p>
         </div>
         <button

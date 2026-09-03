@@ -4,7 +4,9 @@ import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 
 export interface StoredGeneration {
   id: string;
-  sessionId: string;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
   createdAt: string;
   status: "success" | "error";
   adCategory: AdCategory;
@@ -24,7 +26,7 @@ export interface StoredGeneration {
 
 export interface AdminStats {
   totalGenerations: number;
-  uniqueSessions: number;
+  uniqueUsers: number;
   totalCostUsd: number;
   generationsToday: number;
 }
@@ -36,14 +38,31 @@ const putOptions = {
   addRandomSuffix: false,
 } satisfies Pick<PutCommandOptions, "access" | "addRandomSuffix">;
 
+type LegacyStoredGeneration = StoredGeneration & { sessionId?: string };
+
+function normalizeStoredGeneration(
+  record: LegacyStoredGeneration | null,
+): StoredGeneration | null {
+  if (!record) return null;
+
+  return {
+    ...record,
+    userId: record.userId ?? record.sessionId ?? "unknown",
+  };
+}
+
+export function getGenerationOwnerLabel(generation: StoredGeneration): string {
+  return generation.userEmail ?? generation.userName ?? generation.userId;
+}
+
 export function isStorageConfigured(): boolean {
   return Boolean(
     process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID,
   );
 }
 
-function basePath(sessionId: string, generationId: string) {
-  return `generations/${sessionId}/${generationId}`;
+function basePath(userId: string, generationId: string) {
+  return `generations/${userId}/${generationId}`;
 }
 
 function extensionForMime(mimeType: string): string {
@@ -66,7 +85,9 @@ async function uploadBase64Image(
 }
 
 export async function saveGeneration(input: {
-  sessionId: string;
+  userId: string;
+  userEmail?: string;
+  userName?: string;
   generationId: string;
   photoBase64: string;
   photoMimeType: string;
@@ -75,7 +96,9 @@ export async function saveGeneration(input: {
   metadata: Omit<
     StoredGeneration,
     | "id"
-    | "sessionId"
+    | "userId"
+    | "userEmail"
+    | "userName"
     | "createdAt"
     | "originalPhotoUrl"
     | "generatedArtUrl"
@@ -88,7 +111,7 @@ export async function saveGeneration(input: {
     );
   }
 
-  const prefix = basePath(input.sessionId, input.generationId);
+  const prefix = basePath(input.userId, input.generationId);
   const photoExt = extensionForMime(input.photoMimeType);
 
   const originalPhotoUrl = await uploadBase64Image(
@@ -117,7 +140,9 @@ export async function saveGeneration(input: {
 
   const record: StoredGeneration = {
     id: input.generationId,
-    sessionId: input.sessionId,
+    userId: input.userId,
+    userEmail: input.userEmail,
+    userName: input.userName,
     createdAt: new Date().toISOString(),
     originalPhotoUrl,
     generatedArtUrl,
@@ -136,9 +161,9 @@ export async function saveGeneration(input: {
 async function readPrivateJson(pathname: string): Promise<StoredGeneration | null> {
   try {
     const result = await get(pathname, { access: blobAccess });
-    if (!result) return null;
+    if (!result || result.statusCode !== 200 || !result.stream) return null;
     const text = await new Response(result.stream).text();
-    return JSON.parse(text) as StoredGeneration;
+    return normalizeStoredGeneration(JSON.parse(text) as LegacyStoredGeneration);
   } catch {
     return null;
   }
@@ -167,11 +192,11 @@ export function computeAdminStats(generations: StoredGeneration[]): AdminStats {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const sessions = new Set(generations.map((g) => g.sessionId));
+  const users = new Set(generations.map((g) => g.userId));
 
   return {
     totalGenerations: generations.length,
-    uniqueSessions: sessions.size,
+    uniqueUsers: users.size,
     totalCostUsd: generations.reduce(
       (sum, g) => sum + (g.aiCost?.totalUsd ?? 0),
       0,
@@ -226,8 +251,8 @@ export async function listAllGenerations(options?: {
   };
 }
 
-export async function listGenerationsBySession(
-  sessionId: string,
+export async function listGenerationsByUser(
+  userId: string,
 ): Promise<StoredGeneration[]> {
   if (!isStorageConfigured()) {
     return [];
@@ -235,7 +260,7 @@ export async function listGenerationsBySession(
 
   const { list } = await import("@vercel/blob");
   const { blobs } = await list({
-    prefix: `generations/${sessionId}/`,
+    prefix: `generations/${userId}/`,
   });
 
   const metadataBlobs = blobs.filter((blob) =>

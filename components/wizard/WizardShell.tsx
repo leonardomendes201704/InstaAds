@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ProgressDots } from "@/components/ui/ProgressDots";
+import { UserAccountButton } from "@/components/auth/UserAccountButton";
 import { cn } from "@/lib/utils";
 
 interface WizardShellProps {
@@ -9,7 +10,6 @@ interface WizardShellProps {
   title: React.ReactNode;
   subtitle?: string;
   onBack?: () => void;
-  onClose?: () => void;
   showBack?: boolean;
   footer?: React.ReactNode;
   children: React.ReactNode;
@@ -21,7 +21,6 @@ export function WizardShell({
   title,
   subtitle,
   onBack,
-  onClose,
   showBack = true,
   footer,
   children,
@@ -46,14 +45,7 @@ export function WizardShell({
 
           <ProgressDots currentStep={step} />
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-gray-700"
-            aria-label="Fechar"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <UserAccountButton />
         </div>
 
         <div className="pb-3 pt-1 text-center">

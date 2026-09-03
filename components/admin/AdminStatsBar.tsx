@@ -17,7 +17,7 @@ function formatUsd(value: number): string {
 export function AdminStatsBar({ stats, hasMore }: AdminStatsBarProps) {
   const cards = [
     { label: "Gerações (lote)", value: String(stats.totalGenerations) },
-    { label: "Sessões (lote)", value: String(stats.uniqueSessions) },
+    { label: "Usuários (lote)", value: String(stats.uniqueUsers) },
     { label: "Custo IA (lote)", value: formatUsd(stats.totalCostUsd) },
     { label: "Hoje (lote)", value: String(stats.generationsToday) },
   ];

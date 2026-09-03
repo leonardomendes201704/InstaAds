@@ -15,7 +15,6 @@ export function Step1Upload() {
     setPhoto,
     setAdCategory,
     nextStep,
-    reset,
   } = useWizardStore();
 
   const canContinue = Boolean(photoPreviewUrl);
@@ -31,9 +30,6 @@ export function Step1Upload() {
       subtitle="Envie uma foto e a IA transforma em um anúncio para Instagram."
       onBack={() => undefined}
       showBack={false}
-      onClose={() => {
-        if (confirm("Deseja sair e recomeçar?")) reset();
-      }}
       footer={
         <GradientButton disabled={!canContinue} onClick={nextStep}>
           Continuar →

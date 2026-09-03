@@ -37,7 +37,6 @@ export function Step2Personalize() {
     setMainMessage,
     setStep,
     prevStep,
-    reset,
     generateAd,
   } = useWizardStore();
 
@@ -54,9 +53,6 @@ export function Step2Personalize() {
         step={2}
         title="Personalize seu anúncio"
         onBack={prevStep}
-        onClose={() => {
-          if (confirm("Deseja sair e recomeçar?")) reset();
-        }}
         footer={
           <GradientButton
             loading={isGenerating}

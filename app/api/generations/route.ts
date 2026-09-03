@@ -1,19 +1,25 @@
 import { NextResponse } from "next/server";
-import { attachSessionCookie, getOrCreateSessionId } from "@/lib/session";
-import { isStorageConfigured, listGenerationsBySession } from "@/lib/storage";
+import { listGenerationsByUser } from "@/lib/storage";
+import { isStorageConfigured } from "@/lib/storage";
+import { requireCurrentUser } from "@/lib/user";
 
 export async function GET() {
-  if (!isStorageConfigured()) {
-    return NextResponse.json(
-      { error: "Armazenamento não configurado.", generations: [] },
-      { status: 503 },
-    );
+  try {
+    const user = await requireCurrentUser();
+
+    if (!isStorageConfigured()) {
+      return NextResponse.json(
+        { error: "Armazenamento não configurado.", generations: [] },
+        { status: 503 },
+      );
+    }
+
+    const generations = await listGenerationsByUser(user.id);
+    return NextResponse.json({ generations });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro ao listar gerações.";
+    const status = message === "Não autorizado." ? 401 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
-
-  const { sessionId, isNew } = await getOrCreateSessionId();
-  const generations = await listGenerationsBySession(sessionId);
-
-  const response = NextResponse.json({ generations });
-  attachSessionCookie(response, sessionId, isNew);
-  return response;
 }
