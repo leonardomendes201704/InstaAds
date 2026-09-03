@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-import { GradientText } from "@/components/ui/GradientText";
+import { Logo } from "@/components/brand/Logo";
 
 function GoogleIcon() {
   return (
@@ -46,11 +47,15 @@ export function GoogleSignInGate() {
   return (
     <div className="flex h-dvh flex-col items-center justify-center bg-white px-6 pb-safe pt-safe">
       <div className="w-full max-w-md text-center">
-        <h1 className="text-3xl font-bold leading-tight text-foreground">
-          Crie anúncios com <GradientText>IA</GradientText>
+        <div className="mb-6 flex justify-center">
+          <Logo height={40} />
+        </div>
+
+        <h1 className="text-2xl font-bold leading-tight text-foreground">
+          Crie anúncios para Instagram com IA
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          Entre com sua conta Google para começar a gerar artes para Instagram.
+          Entre com sua conta Google para começar a gerar artes publicitárias.
         </p>
 
         <button
@@ -68,6 +73,18 @@ export function GoogleSignInGate() {
             {error}
           </p>
         ) : null}
+
+        <p className="mt-8 text-xs leading-relaxed text-muted">
+          Ao continuar, você concorda com os{" "}
+          <Link href="/termos" className="text-accent-purple hover:underline">
+            Termos de Serviço
+          </Link>{" "}
+          e a{" "}
+          <Link href="/privacidade" className="text-accent-purple hover:underline">
+            Política de Privacidade
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );

@@ -30,6 +30,7 @@ export function Step1Upload() {
       subtitle="Envie uma foto e a IA transforma em um anúncio para Instagram."
       onBack={() => undefined}
       showBack={false}
+      showBrand
       footer={
         <GradientButton disabled={!canContinue} onClick={nextStep}>
           Continuar →

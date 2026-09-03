@@ -3,6 +3,7 @@
 import { ArrowLeft } from "lucide-react";
 import { ProgressDots } from "@/components/ui/ProgressDots";
 import { UserAccountButton } from "@/components/auth/UserAccountButton";
+import { LogoIcon } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 
 interface WizardShellProps {
@@ -11,6 +12,7 @@ interface WizardShellProps {
   subtitle?: string;
   onBack?: () => void;
   showBack?: boolean;
+  showBrand?: boolean;
   footer?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
@@ -22,6 +24,7 @@ export function WizardShell({
   subtitle,
   onBack,
   showBack = true,
+  showBrand = false,
   footer,
   children,
   className,
@@ -39,6 +42,8 @@ export function WizardShell({
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
+          ) : showBrand ? (
+            <LogoIcon size={28} />
           ) : (
             <span className="h-10 w-10" />
           )}

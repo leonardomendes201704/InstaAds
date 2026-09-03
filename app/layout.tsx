@@ -11,6 +11,10 @@ export const metadata: Metadata = {
   title: "InstaAds — Crie anúncios para Instagram com IA",
   description:
     "Envie uma foto e a IA transforma em um anúncio para Instagram em segundos.",
+  icons: {
+    icon: [{ url: "/logo-icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/instaads-logo.png", type: "image/png" }],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
