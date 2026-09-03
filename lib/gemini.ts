@@ -1,6 +1,12 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { buildAdArtPrompt } from "@/lib/ad-prompt";
-import type { AdCategory, AdStyle, GeneratedAdCopy, PublishTarget } from "@/lib/types";
+import type {
+  AdArtworkCopy,
+  AdCategory,
+  AdStyle,
+  GeneratedAdCopy,
+  PublishTarget,
+} from "@/lib/types";
 import {
   categoryLabels,
   publishLabels,
@@ -38,7 +44,109 @@ export interface GeneratedAdResult {
   headline: string;
   subheadline: string;
   tagline: string;
+  benefits: [string, string, string];
   cta: string;
+}
+
+const artworkCopySchema = {
+  type: Type.OBJECT,
+  properties: {
+    headline: { type: Type.STRING },
+    subheadline: { type: Type.STRING },
+    benefits: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+    cta: { type: Type.STRING },
+  },
+  required: ["headline", "subheadline", "benefits", "cta"],
+};
+
+const defaultCta: Record<AdCategory, string> = {
+  produto: "Envie uma mensagem",
+  servico: "Chame no WhatsApp",
+  promocao: "Peça o seu agora",
+};
+
+function normalizeBenefits(benefits: string[] | undefined): [string, string, string] {
+  const items = (benefits ?? []).filter(Boolean).slice(0, 3);
+  while (items.length < 3) {
+    items.push(
+      items.length === 0
+        ? "Design exclusivo"
+        : items.length === 1
+          ? "Qualidade premium"
+          : "Pronto para usar",
+    );
+  }
+  return [items[0], items[1], items[2]];
+}
+
+export async function generateAdArtworkCopy(input: {
+  photoBase64: string;
+  photoMimeType: string;
+  mainMessage: string;
+  adStyle: AdStyle;
+  adCategory: AdCategory;
+  publishTarget: PublishTarget;
+}): Promise<AdArtworkCopy> {
+  const ai = getClient();
+
+  const response = await ai.models.generateContent({
+    model: TEXT_MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType: input.photoMimeType,
+              data: input.photoBase64,
+            },
+          },
+          {
+            text: `Você é copywriter brasileiro especialista em anúncios de Instagram/Facebook.
+
+Analise o produto na foto e crie textos para uma arte publicitária em português do BRASIL (PT-BR).
+
+REGRAS OBRIGATÓRIAS:
+- APENAS português do Brasil correto, com acentuação
+- PROIBIDO: inglês, espanhol, palavras inventadas, erros de ortografia
+- headline: máximo 50 caracteres, impactante, CAIXA ALTA opcional
+- subheadline: máximo 80 caracteres, benefício principal
+- benefits: exatamente 3 itens curtos (máx. 35 caracteres cada), sem bullet na string
+- cta: máximo 25 caracteres, ação clara (ex: "Envie uma mensagem")
+
+Contexto:
+- Mensagem do anunciante: "${input.mainMessage}"
+- Categoria: ${categoryLabels[input.adCategory]}
+- Estilo: ${styleLabels[input.adStyle]}
+- Canal: ${publishLabels[input.publishTarget]}
+- CTA sugerido: "${defaultCta[input.adCategory]}"`,
+          },
+        ],
+      },
+    ],
+    config: {
+      temperature: 0.4,
+      responseMimeType: "application/json",
+      responseSchema: artworkCopySchema,
+    },
+  });
+
+  const raw = response.text;
+  if (!raw) {
+    throw new Error("Resposta vazia ao gerar textos do anúncio.");
+  }
+
+  const parsed = JSON.parse(raw) as AdArtworkCopy;
+
+  return {
+    headline: parsed.headline?.trim() || input.mainMessage.toUpperCase(),
+    subheadline: parsed.subheadline?.trim() || "",
+    benefits: normalizeBenefits(parsed.benefits),
+    cta: parsed.cta?.trim() || defaultCta[input.adCategory],
+  };
 }
 
 function extractImageFromResponse(response: {
@@ -70,7 +178,7 @@ function extractImageFromResponse(response: {
 async function generateAdArtworkVariant(input: {
   photoBase64: string;
   photoMimeType: string;
-  mainMessage: string;
+  copy: AdArtworkCopy;
   adCategory: AdCategory;
   adStyle: AdStyle;
   publishTarget: PublishTarget;
@@ -78,7 +186,7 @@ async function generateAdArtworkVariant(input: {
 }): Promise<GeneratedAdImage> {
   const ai = getClient();
   const prompt = buildAdArtPrompt({
-    mainMessage: input.mainMessage,
+    copy: input.copy,
     adCategory: input.adCategory,
     adStyle: input.adStyle,
     publishTarget: input.publishTarget,
@@ -102,7 +210,7 @@ async function generateAdArtworkVariant(input: {
       },
     ],
     config: {
-      responseModalities: [Modality.TEXT, Modality.IMAGE],
+      responseModalities: [Modality.IMAGE],
       imageConfig: {
         aspectRatio: input.aspectRatio,
         imageSize: "1K",
@@ -131,23 +239,25 @@ export async function generateAdArtworks(input: {
   adCategory: AdCategory;
   publishTarget: PublishTarget;
 }): Promise<GeneratedAdResult> {
+  const copy = await generateAdArtworkCopy(input);
+
   const result: GeneratedAdResult = {
-    headline: input.mainMessage,
-    subheadline: "",
-    tagline: "Qualidade premium para você",
-    cta:
-      input.adCategory === "servico"
-        ? "Chame no WhatsApp"
-        : input.adCategory === "promocao"
-          ? "Peça o seu agora"
-          : "Envie uma mensagem",
+    headline: copy.headline,
+    subheadline: copy.subheadline,
+    tagline: copy.benefits.join(" • "),
+    benefits: copy.benefits,
+    cta: copy.cta,
   };
 
   const tasks: Array<Promise<void>> = [];
 
   if (input.publishTarget === "feed" || input.publishTarget === "both") {
     tasks.push(
-      generateAdArtworkVariant({ ...input, aspectRatio: "4:5" }).then((image) => {
+      generateAdArtworkVariant({
+        ...input,
+        copy,
+        aspectRatio: "4:5",
+      }).then((image) => {
         result.feedImage = image;
       }),
     );
@@ -155,7 +265,11 @@ export async function generateAdArtworks(input: {
 
   if (input.publishTarget === "stories" || input.publishTarget === "both") {
     tasks.push(
-      generateAdArtworkVariant({ ...input, aspectRatio: "9:16" }).then((image) => {
+      generateAdArtworkVariant({
+        ...input,
+        copy,
+        aspectRatio: "9:16",
+      }).then((image) => {
         result.storiesImage = image;
       }),
     );
@@ -175,11 +289,11 @@ export async function suggestAdMessage(input: {
 
   const response = await ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Você cria frases curtas de anúncio para Instagram em português do Brasil. Responda apenas com a frase, sem aspas.
+    contents: `Você cria frases curtas de anúncio para Instagram em português do Brasil. Responda apenas com a frase, sem aspas. Use português correto, sem inglês ou espanhol.
 
 Crie uma mensagem principal curta (máx. 60 caracteres) para anunciar um ${categoryLabels[input.adCategory]} com estilo ${styleLabels[input.adStyle]} para ${publishLabels[input.publishTarget]}.`,
     config: {
-      temperature: 0.8,
+      temperature: 0.6,
     },
   });
 
@@ -217,7 +331,7 @@ export async function generateAdCopy(input: {
 
   const response = await ai.models.generateContent({
     model: TEXT_MODEL,
-    contents: `Gere copy para anúncio Instagram em português do Brasil.
+    contents: `Gere copy para anúncio Instagram em português do Brasil. PROIBIDO inglês ou espanhol.
 Mensagem principal: ${input.mainMessage}
 Categoria: ${categoryLabels[input.adCategory]}
 Estilo: ${styleLabels[input.adStyle]}
@@ -225,7 +339,7 @@ Formato: ${publishLabels[input.publishTarget]}
 
 Retorne headline, subheadline, tagline, cta e layout (textAlign, overlayOpacity, accentColor, fontWeight).`,
     config: {
-      temperature: 0.7,
+      temperature: 0.5,
       responseMimeType: "application/json",
       responseSchema: adCopySchema,
     },

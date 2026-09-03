@@ -15,6 +15,13 @@ export interface AdLayout {
   fontWeight: "normal" | "bold";
 }
 
+export interface AdArtworkCopy {
+  headline: string;
+  subheadline: string;
+  benefits: [string, string, string];
+  cta: string;
+}
+
 export interface GeneratedAdCopy {
   headline: string;
   subheadline: string;
@@ -24,6 +31,7 @@ export interface GeneratedAdCopy {
 }
 
 export interface GeneratedAd extends GeneratedAdCopy {
+  benefits?: [string, string, string];
   feedBlobUrl?: string;
   storiesBlobUrl?: string;
 }

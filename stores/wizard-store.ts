@@ -158,6 +158,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
         headline?: string;
         subheadline?: string;
         tagline?: string;
+        benefits?: [string, string, string];
         cta?: string;
         error?: string;
       };
@@ -170,6 +171,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
         headline: data.headline ?? mainMessage,
         subheadline: data.subheadline ?? "",
         tagline: data.tagline ?? "",
+        benefits: data.benefits,
         cta: data.cta ?? "Envie uma mensagem",
         layout: defaultLayout,
         feedBlobUrl: data.feedImage
