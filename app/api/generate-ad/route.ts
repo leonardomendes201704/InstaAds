@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
+import { logActivity } from "@/lib/db/activity";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 import { generateAdArtworks } from "@/lib/gemini";
 import { isStorageConfigured, saveGeneration } from "@/lib/storage";
-import { requireCurrentUser } from "@/lib/user";
+import { requireCurrentUser, UserBlockedError } from "@/lib/user";
 
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
+  let userId: string | undefined;
+  let generationId: string | undefined;
+
   try {
     const user = await requireCurrentUser();
+    userId = user.id;
 
     const body = (await request.json()) as {
       mainMessage: string;
@@ -26,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const generationId = crypto.randomUUID();
+    generationId = crypto.randomUUID();
 
     const result = await generateAdArtworks({
       photoBase64: body.photoBase64,
@@ -67,11 +72,12 @@ export async function POST(request: Request) {
         stored = true;
       } catch (error) {
         storageError =
-          error instanceof Error ? error.message : "Erro ao salvar no Blob.";
-        console.error("Falha ao salvar geração no Blob:", error);
+          error instanceof Error ? error.message : "Erro ao salvar geração.";
+        console.error("Falha ao salvar geração:", error);
       }
     } else {
-      storageError = "Vercel Blob não configurado (BLOB_STORE_ID ou BLOB_READ_WRITE_TOKEN).";
+      storageError =
+        "Supabase não configurado (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).";
     }
 
     return NextResponse.json({
@@ -81,6 +87,21 @@ export async function POST(request: Request) {
       storageError,
     });
   } catch (error) {
+    if (userId && generationId && isStorageConfigured()) {
+      await logActivity({
+        userId,
+        type: "generation.failed",
+        metadata: {
+          generationId,
+          error: error instanceof Error ? error.message : "Erro desconhecido",
+        },
+      });
+    }
+
+    if (error instanceof UserBlockedError) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
+
     const message =
       error instanceof Error ? error.message : "Erro ao gerar anúncio.";
     const status = message === "Não autorizado." ? 401 : 500;

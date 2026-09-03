@@ -45,8 +45,19 @@ export function GoogleSignInGate() {
   }
 
   return (
-    <div className="flex h-dvh flex-col items-center justify-center bg-white px-6 pb-safe pt-safe">
-      <div className="w-full max-w-md text-center">
+    <div className="relative flex h-dvh flex-col items-center justify-center overflow-hidden px-6 pb-safe pt-safe">
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat md:hidden"
+        style={{ backgroundImage: "url(/bg-mobile.png)" }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 hidden bg-cover bg-center bg-no-repeat md:block"
+        style={{ backgroundImage: "url(/bg-wide.png)" }}
+      />
+
+      <div className="relative z-10 w-full max-w-md text-center">
         <div className="mb-6 flex justify-center">
           <Logo height={40} />
         </div>
@@ -62,7 +73,7 @@ export function GoogleSignInGate() {
           type="button"
           onClick={() => void handleSignIn()}
           disabled={loading}
-          className="mt-8 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white px-4 py-3.5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-surface disabled:opacity-60"
+          className="mt-8 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white/95 px-4 py-3.5 text-sm font-medium text-foreground shadow-md backdrop-blur-sm transition-colors hover:bg-white disabled:opacity-60"
         >
           <GoogleIcon />
           {loading ? "Redirecionando..." : "Continuar com Google"}

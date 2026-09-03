@@ -1,4 +1,4 @@
-import type { StoredGeneration } from "@/lib/storage";
+import type { StoredGeneration } from "@/lib/db/types";
 import { getGenerationOwnerLabel, pathnameFromBlobUrl } from "@/lib/storage";
 import { categoryLabels, publishLabels } from "@/lib/ad-styles";
 
@@ -29,10 +29,18 @@ function formatUsd(value: number): string {
   }).format(value);
 }
 
-function mediaUrl(blobUrl?: string): string | undefined {
-  if (!blobUrl) return undefined;
-  const path = pathnameFromBlobUrl(blobUrl);
-  if (!path) return undefined;
+function mediaUrl(storagePath?: string): string | undefined {
+  if (!storagePath) return undefined;
+
+  let path = storagePath;
+  if (storagePath.startsWith("http")) {
+    const extracted = pathnameFromBlobUrl(storagePath);
+    if (!extracted) return undefined;
+    path = extracted.startsWith("generations/")
+      ? extracted.slice("generations/".length)
+      : extracted;
+  }
+
   return `/api/admin/media?path=${encodeURIComponent(path)}`;
 }
 

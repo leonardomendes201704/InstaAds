@@ -1,68 +1,34 @@
-import { get, put, type PutCommandOptions } from "@vercel/blob";
-import type { AiCostEstimate } from "@/lib/ai-cost";
-import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
+import { logActivity } from "@/lib/db/activity";
+import {
+  getGenerationOwnerLabel,
+  insertGeneration,
+  listAllGenerations as listAllFromDb,
+  listGenerationsByUser as listByUserFromDb,
+  computeAdminStats,
+  rowToStoredGeneration,
+} from "@/lib/db/generations";
+import type { AdminStats, StoredGeneration } from "@/lib/db/types";
+import { upsertProfile, uploadGenerationFile } from "@/lib/db/profiles";
+import {
+  GENERATIONS_BUCKET,
+  getSupabaseAdmin,
+  isSupabaseConfigured,
+} from "@/lib/supabase/server";
 
-export interface StoredGeneration {
-  id: string;
-  userId: string;
-  userEmail?: string;
-  userName?: string;
-  createdAt: string;
-  status: "success" | "error";
-  adCategory: AdCategory;
-  adStyle: AdStyle;
-  mainMessage: string;
-  publishTarget: PublishTarget;
-  headline: string;
-  subheadline: string;
-  benefits: [string, string, string];
-  cta: string;
-  originalPhotoUrl: string;
-  generatedArtUrl?: string;
-  generatedStoriesUrl?: string;
-  errorMessage?: string;
-  aiCost?: AiCostEstimate;
-}
-
-export interface AdminStats {
-  totalGenerations: number;
-  uniqueUsers: number;
-  totalCostUsd: number;
-  generationsToday: number;
-}
-
-const blobAccess = (process.env.BLOB_ACCESS ?? "private") as "public" | "private";
-
-const putOptions = {
-  access: blobAccess,
-  addRandomSuffix: false,
-} satisfies Pick<PutCommandOptions, "access" | "addRandomSuffix">;
-
-type LegacyStoredGeneration = StoredGeneration & { sessionId?: string };
-
-function normalizeStoredGeneration(
-  record: LegacyStoredGeneration | null,
-): StoredGeneration | null {
-  if (!record) return null;
-
-  return {
-    ...record,
-    userId: record.userId ?? record.sessionId ?? "unknown",
-  };
-}
-
-export function getGenerationOwnerLabel(generation: StoredGeneration): string {
-  return generation.userEmail ?? generation.userName ?? generation.userId;
-}
+export type { AdminStats, StoredGeneration };
+export {
+  getGenerationOwnerLabel,
+  computeAdminStats,
+  listAllFromDb as listAllGenerations,
+  listByUserFromDb as listGenerationsByUser,
+};
 
 export function isStorageConfigured(): boolean {
-  return Boolean(
-    process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_STORE_ID,
-  );
+  return isSupabaseConfigured();
 }
 
-function basePath(userId: string, generationId: string) {
-  return `generations/${userId}/${generationId}`;
+function storagePath(userId: string, generationId: string, filename: string) {
+  return `${userId}/${generationId}/${filename}`;
 }
 
 function extensionForMime(mimeType: string): string {
@@ -72,16 +38,35 @@ function extensionForMime(mimeType: string): string {
 }
 
 async function uploadBase64Image(
-  pathname: string,
+  path: string,
   base64: string,
   mimeType: string,
 ): Promise<string> {
   const buffer = Buffer.from(base64, "base64");
-  const blob = await put(pathname, buffer, {
-    ...putOptions,
-    contentType: mimeType,
-  });
-  return blob.url;
+  await uploadGenerationFile(path, buffer, mimeType);
+  return path;
+}
+
+export function isValidGenerationPath(path: string): boolean {
+  if (path.includes("..")) return false;
+  const parts = path.split("/");
+  if (parts.length !== 3) return false;
+  return parts.every((part) => part.length > 0);
+}
+
+export async function getPrivateBlob(pathname: string) {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.storage
+    .from(GENERATIONS_BUCKET)
+    .download(pathname);
+
+  if (error || !data) return null;
+
+  return {
+    stream: data.stream(),
+    blob: { contentType: data.type || "application/octet-stream" },
+    statusCode: 200 as const,
+  };
 }
 
 export async function saveGeneration(input: {
@@ -107,66 +92,82 @@ export async function saveGeneration(input: {
 }): Promise<StoredGeneration> {
   if (!isStorageConfigured()) {
     throw new Error(
-      "Vercel Blob não configurado (BLOB_STORE_ID ou BLOB_READ_WRITE_TOKEN).",
+      "Supabase não configurado (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).",
     );
   }
 
-  const prefix = basePath(input.userId, input.generationId);
-  const photoExt = extensionForMime(input.photoMimeType);
+  await upsertProfile({
+    id: input.userId,
+    email: input.userEmail,
+    name: input.userName,
+  });
 
-  const originalPhotoUrl = await uploadBase64Image(
-    `${prefix}/original.${photoExt}`,
+  const photoExt = extensionForMime(input.photoMimeType);
+  const originalPath = await uploadBase64Image(
+    storagePath(input.userId, input.generationId, `original.${photoExt}`),
     input.photoBase64,
     input.photoMimeType,
   );
 
-  let generatedArtUrl: string | undefined;
+  let feedPath: string | undefined;
   if (input.feedImage) {
-    generatedArtUrl = await uploadBase64Image(
-      `${prefix}/art-feed.${extensionForMime(input.feedImage.mimeType)}`,
+    feedPath = await uploadBase64Image(
+      storagePath(
+        input.userId,
+        input.generationId,
+        `art-feed.${extensionForMime(input.feedImage.mimeType)}`,
+      ),
       input.feedImage.base64,
       input.feedImage.mimeType,
     );
   }
 
-  let generatedStoriesUrl: string | undefined;
+  let storiesPath: string | undefined;
   if (input.storiesImage) {
-    generatedStoriesUrl = await uploadBase64Image(
-      `${prefix}/art-stories.${extensionForMime(input.storiesImage.mimeType)}`,
+    storiesPath = await uploadBase64Image(
+      storagePath(
+        input.userId,
+        input.generationId,
+        `art-stories.${extensionForMime(input.storiesImage.mimeType)}`,
+      ),
       input.storiesImage.base64,
       input.storiesImage.mimeType,
     );
   }
 
-  const record: StoredGeneration = {
+  const record = await insertGeneration({
     id: input.generationId,
     userId: input.userId,
     userEmail: input.userEmail,
     userName: input.userName,
-    createdAt: new Date().toISOString(),
-    originalPhotoUrl,
-    generatedArtUrl,
-    generatedStoriesUrl,
-    ...input.metadata,
-  };
+    status: input.metadata.status,
+    adCategory: input.metadata.adCategory,
+    adStyle: input.metadata.adStyle,
+    mainMessage: input.metadata.mainMessage,
+    publishTarget: input.metadata.publishTarget,
+    headline: input.metadata.headline,
+    subheadline: input.metadata.subheadline,
+    benefits: input.metadata.benefits,
+    cta: input.metadata.cta,
+    originalPath,
+    feedPath,
+    storiesPath,
+    errorMessage: input.metadata.errorMessage,
+    aiCost: input.metadata.aiCost,
+  });
 
-  await put(`${prefix}/metadata.json`, JSON.stringify(record), {
-    ...putOptions,
-    contentType: "application/json",
+  await logActivity({
+    userId: input.userId,
+    type: "generation.completed",
+    metadata: {
+      generationId: input.generationId,
+      adCategory: input.metadata.adCategory,
+      adStyle: input.metadata.adStyle,
+      aiCostUsd: input.metadata.aiCost?.totalUsd,
+    },
   });
 
   return record;
-}
-
-async function readPrivateJson(pathname: string): Promise<StoredGeneration | null> {
-  try {
-    const result = await get(pathname, { access: blobAccess });
-    if (!result || result.statusCode !== 200 || !result.stream) return null;
-    const text = await new Response(result.stream).text();
-    return normalizeStoredGeneration(JSON.parse(text) as LegacyStoredGeneration);
-  } catch {
-    return null;
-  }
 }
 
 export function pathnameFromBlobUrl(url: string): string | null {
@@ -178,103 +179,15 @@ export function pathnameFromBlobUrl(url: string): string | null {
   }
 }
 
-export function isValidGenerationPath(path: string): boolean {
-  if (!path.startsWith("generations/")) return false;
-  if (path.includes("..")) return false;
-  return true;
+export async function generationExists(id: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { count, error } = await supabase
+    .from("generations")
+    .select("*", { count: "exact", head: true })
+    .eq("id", id);
+
+  if (error) throw error;
+  return (count ?? 0) > 0;
 }
 
-export async function getPrivateBlob(pathname: string) {
-  return get(pathname, { access: blobAccess });
-}
-
-export function computeAdminStats(generations: StoredGeneration[]): AdminStats {
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const users = new Set(generations.map((g) => g.userId));
-
-  return {
-    totalGenerations: generations.length,
-    uniqueUsers: users.size,
-    totalCostUsd: generations.reduce(
-      (sum, g) => sum + (g.aiCost?.totalUsd ?? 0),
-      0,
-    ),
-    generationsToday: generations.filter(
-      (g) => new Date(g.createdAt) >= todayStart,
-    ).length,
-  };
-}
-
-export async function listAllGenerations(options?: {
-  cursor?: string;
-  limit?: number;
-}): Promise<{
-  generations: StoredGeneration[];
-  cursor?: string;
-  hasMore: boolean;
-}> {
-  if (!isStorageConfigured()) {
-    return { generations: [], hasMore: false };
-  }
-
-  const pageSize = options?.limit ?? 20;
-  const { list } = await import("@vercel/blob");
-
-  const result = await list({
-    prefix: "generations/",
-    cursor: options?.cursor,
-    limit: 1000,
-  });
-
-  const metadataBlobs = result.blobs.filter((blob) =>
-    blob.pathname.endsWith("/metadata.json"),
-  );
-
-  const records = await Promise.all(
-    metadataBlobs.map((blob) => readPrivateJson(blob.pathname)),
-  );
-
-  const generations = records
-    .filter((record): record is StoredGeneration => record !== null)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-    .slice(0, pageSize);
-
-  return {
-    generations,
-    cursor: result.cursor,
-    hasMore: Boolean(result.hasMore && result.cursor),
-  };
-}
-
-export async function listGenerationsByUser(
-  userId: string,
-): Promise<StoredGeneration[]> {
-  if (!isStorageConfigured()) {
-    return [];
-  }
-
-  const { list } = await import("@vercel/blob");
-  const { blobs } = await list({
-    prefix: `generations/${userId}/`,
-  });
-
-  const metadataBlobs = blobs.filter((blob) =>
-    blob.pathname.endsWith("/metadata.json"),
-  );
-
-  const records = await Promise.all(
-    metadataBlobs.map((blob) => readPrivateJson(blob.pathname)),
-  );
-
-  return records
-    .filter((record): record is StoredGeneration => record !== null)
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-}
+export { rowToStoredGeneration };

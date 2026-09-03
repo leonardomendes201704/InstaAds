@@ -1,4 +1,13 @@
 import { auth } from "@/auth";
+import { getProfile } from "@/lib/db/profiles";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
+
+export class UserBlockedError extends Error {
+  constructor() {
+    super("Conta bloqueada. Entre em contato com o suporte.");
+    this.name = "UserBlockedError";
+  }
+}
 
 export async function getCurrentUser() {
   const session = await auth();
@@ -17,5 +26,13 @@ export async function requireCurrentUser() {
   if (!user) {
     throw new Error("Não autorizado.");
   }
+
+  if (isSupabaseConfigured()) {
+    const profile = await getProfile(user.id);
+    if (profile?.status === "blocked") {
+      throw new UserBlockedError();
+    }
+  }
+
   return user;
 }

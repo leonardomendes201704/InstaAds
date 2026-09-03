@@ -1,8 +1,5 @@
-import { AdminShell } from "@/components/admin/AdminShell";
-import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { AdminOverview } from "@/components/admin/AdminOverview";
 
-export default async function AdminPage() {
-  const authenticated = await isAdminAuthenticated();
-
-  return <AdminShell authenticated={authenticated} />;
+export default function AdminDashboardPage() {
+  return <AdminOverview />;
 }

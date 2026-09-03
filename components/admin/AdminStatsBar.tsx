@@ -1,8 +1,7 @@
-import type { AdminStats } from "@/lib/storage";
+import type { DashboardStats } from "@/lib/db/types";
 
 interface AdminStatsBarProps {
-  stats: AdminStats;
-  hasMore: boolean;
+  stats: DashboardStats;
 }
 
 function formatUsd(value: number): string {
@@ -14,17 +13,29 @@ function formatUsd(value: number): string {
   }).format(value);
 }
 
-export function AdminStatsBar({ stats, hasMore }: AdminStatsBarProps) {
+function formatDateLabel(isoDate: string): string {
+  const [, month, day] = isoDate.split("-");
+  return `${day}/${month}`;
+}
+
+export function AdminStatsBar({ stats }: AdminStatsBarProps) {
   const cards = [
-    { label: "Gerações (lote)", value: String(stats.totalGenerations) },
-    { label: "Usuários (lote)", value: String(stats.uniqueUsers) },
-    { label: "Custo IA (lote)", value: formatUsd(stats.totalCostUsd) },
-    { label: "Hoje (lote)", value: String(stats.generationsToday) },
+    { label: "Usuários", value: String(stats.totalUsers) },
+    { label: "Gerações", value: String(stats.totalGenerations) },
+    { label: "Custo IA total", value: formatUsd(stats.totalCostUsd) },
+    { label: "Gerações hoje", value: String(stats.generationsToday) },
+    { label: "Novos usuários hoje", value: String(stats.usersToday) },
+    { label: "Usuários bloqueados", value: String(stats.blockedUsers) },
   ];
 
+  const maxCount = Math.max(
+    ...stats.generationsByDay.map((d) => d.count),
+    1,
+  );
+
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         {cards.map((card) => (
           <div
             key={card.label}
@@ -39,12 +50,33 @@ export function AdminStatsBar({ stats, hasMore }: AdminStatsBarProps) {
           </div>
         ))}
       </div>
-      {hasMore ? (
-        <p className="mt-3 text-xs text-muted">
-          Métricas referentes ao lote carregado. Use &quot;Carregar mais&quot; para
-          incluir gerações adicionais.
+
+      <div className="rounded-2xl border border-black/10 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-foreground">
+          Gerações nos últimos 7 dias
         </p>
-      ) : null}
+        <div className="mt-4 flex items-end gap-2">
+          {stats.generationsByDay.map((day) => (
+            <div key={day.date} className="flex flex-1 flex-col items-center gap-2">
+              <div className="flex h-24 w-full items-end">
+                <div
+                  className="w-full rounded-t-md bg-accent-purple/80 transition-all"
+                  style={{
+                    height: `${Math.max(8, (day.count / maxCount) * 100)}%`,
+                  }}
+                  title={`${day.count} gerações`}
+                />
+              </div>
+              <span className="text-[10px] text-muted">
+                {formatDateLabel(day.date)}
+              </span>
+              <span className="text-xs font-medium text-foreground">
+                {day.count}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
