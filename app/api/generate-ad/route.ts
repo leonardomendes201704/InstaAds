@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     });
 
     let stored = false;
+    let storageError: string | undefined;
 
     if (isStorageConfigured()) {
       try {
@@ -60,15 +61,20 @@ export async function POST(request: Request) {
           },
         });
         stored = true;
-      } catch (storageError) {
-        console.error("Falha ao salvar geração no Blob:", storageError);
+      } catch (error) {
+        storageError =
+          error instanceof Error ? error.message : "Erro ao salvar no Blob.";
+        console.error("Falha ao salvar geração no Blob:", error);
       }
+    } else {
+      storageError = "BLOB_READ_WRITE_TOKEN não configurado.";
     }
 
     const response = NextResponse.json({
       ...result,
       generationId,
       stored,
+      storageError,
     });
 
     attachSessionCookie(response, sessionId, isNew);

@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { get, put, type PutCommandOptions } from "@vercel/blob";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 
 export interface StoredGeneration {
@@ -19,6 +19,13 @@ export interface StoredGeneration {
   generatedStoriesUrl?: string;
   errorMessage?: string;
 }
+
+const blobAccess = (process.env.BLOB_ACCESS ?? "private") as "public" | "private";
+
+const putOptions = {
+  access: blobAccess,
+  addRandomSuffix: false,
+} satisfies Pick<PutCommandOptions, "access" | "addRandomSuffix">;
 
 export function isStorageConfigured(): boolean {
   return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
@@ -41,9 +48,8 @@ async function uploadBase64Image(
 ): Promise<string> {
   const buffer = Buffer.from(base64, "base64");
   const blob = await put(pathname, buffer, {
-    access: "public",
+    ...putOptions,
     contentType: mimeType,
-    addRandomSuffix: false,
   });
   return blob.url;
 }
@@ -107,12 +113,22 @@ export async function saveGeneration(input: {
   };
 
   await put(`${prefix}/metadata.json`, JSON.stringify(record), {
-    access: "public",
+    ...putOptions,
     contentType: "application/json",
-    addRandomSuffix: false,
   });
 
   return record;
+}
+
+async function readPrivateJson(pathname: string): Promise<StoredGeneration | null> {
+  try {
+    const result = await get(pathname, { access: blobAccess });
+    if (!result) return null;
+    const text = await new Response(result.stream).text();
+    return JSON.parse(text) as StoredGeneration;
+  } catch {
+    return null;
+  }
 }
 
 export async function listGenerationsBySession(
@@ -127,14 +143,12 @@ export async function listGenerationsBySession(
     prefix: `generations/${sessionId}/`,
   });
 
-  const metadataBlobs = blobs.filter((blob) => blob.pathname.endsWith("/metadata.json"));
+  const metadataBlobs = blobs.filter((blob) =>
+    blob.pathname.endsWith("/metadata.json"),
+  );
 
   const records = await Promise.all(
-    metadataBlobs.map(async (blob) => {
-      const response = await fetch(blob.url);
-      if (!response.ok) return null;
-      return (await response.json()) as StoredGeneration;
-    }),
+    metadataBlobs.map((blob) => readPrivateJson(blob.pathname)),
   );
 
   return records
