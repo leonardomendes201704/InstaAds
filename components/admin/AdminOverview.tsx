@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ActivityEvent } from "@/lib/db/types";
 import { AdminStatsBar } from "@/components/admin/AdminStatsBar";
+import { AdminDashboardCharts } from "@/components/admin/AdminDashboardCharts";
 import { ActivityFeed } from "@/components/admin/ActivityFeed";
 import { MigrateBlobPanel } from "@/components/admin/MigrateBlobPanel";
 import type { DashboardStats } from "@/lib/db/types";
@@ -89,6 +90,7 @@ export function AdminOverview() {
             <MigrateBlobPanel onComplete={() => void loadDashboard()} />
           ) : null}
           <AdminStatsBar stats={stats} />
+          <AdminDashboardCharts stats={stats} />
           <div>
             <h2 className="mb-4 text-lg font-semibold text-foreground">
               Atividade recente

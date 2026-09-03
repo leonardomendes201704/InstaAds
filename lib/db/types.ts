@@ -52,6 +52,7 @@ export interface DashboardStats extends AdminStats {
   usersThisWeek: number;
   blockedUsers: number;
   generationsByDay: { date: string; count: number }[];
+  usersByDay: { date: string; count: number }[];
 }
 
 export type ActivityType =

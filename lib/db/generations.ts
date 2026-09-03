@@ -211,6 +211,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     usersWeekResult,
     blockedResult,
     recentGenerations,
+    recentProfiles,
   ] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase
@@ -230,6 +231,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       .select("created_at")
       .gte("created_at", weekIso)
       .order("created_at", { ascending: true }),
+    supabase
+      .from("profiles")
+      .select("created_at")
+      .gte("created_at", weekIso)
+      .order("created_at", { ascending: true }),
   ]);
 
   if (totalUsersResult.error) throw totalUsersResult.error;
@@ -237,18 +243,32 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   if (usersWeekResult.error) throw usersWeekResult.error;
   if (blockedResult.error) throw blockedResult.error;
   if (recentGenerations.error) throw recentGenerations.error;
+  if (recentProfiles.error) throw recentProfiles.error;
 
-  const dayCounts = new Map<string, number>();
+  const dayKeys: string[] = [];
+  const generationDayCounts = new Map<string, number>();
+  const userDayCounts = new Map<string, number>();
+
   for (let i = 6; i >= 0; i -= 1) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    dayCounts.set(d.toISOString().slice(0, 10), 0);
+    const key = d.toISOString().slice(0, 10);
+    dayKeys.push(key);
+    generationDayCounts.set(key, 0);
+    userDayCounts.set(key, 0);
   }
 
   for (const row of recentGenerations.data ?? []) {
     const date = row.created_at.slice(0, 10);
-    if (dayCounts.has(date)) {
-      dayCounts.set(date, (dayCounts.get(date) ?? 0) + 1);
+    if (generationDayCounts.has(date)) {
+      generationDayCounts.set(date, (generationDayCounts.get(date) ?? 0) + 1);
+    }
+  }
+
+  for (const row of recentProfiles.data ?? []) {
+    const date = row.created_at.slice(0, 10);
+    if (userDayCounts.has(date)) {
+      userDayCounts.set(date, (userDayCounts.get(date) ?? 0) + 1);
     }
   }
 
@@ -258,9 +278,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     usersToday: usersTodayResult.count ?? 0,
     usersThisWeek: usersWeekResult.count ?? 0,
     blockedUsers: blockedResult.count ?? 0,
-    generationsByDay: Array.from(dayCounts.entries()).map(([date, count]) => ({
+    generationsByDay: dayKeys.map((date) => ({
       date,
-      count,
+      count: generationDayCounts.get(date) ?? 0,
+    })),
+    usersByDay: dayKeys.map((date) => ({
+      date,
+      count: userDayCounts.get(date) ?? 0,
     })),
   };
 }
