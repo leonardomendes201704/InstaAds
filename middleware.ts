@@ -5,6 +5,8 @@ const protectedApiPrefixes = [
   "/api/generate-ad",
   "/api/generations",
   "/api/suggest-text",
+  "/api/device/sync",
+  "/api/device/access-request",
 ];
 
 export default auth((request) => {
@@ -26,5 +28,7 @@ export const config = {
     "/api/generate-ad",
     "/api/generations",
     "/api/suggest-text",
+    "/api/device/sync",
+    "/api/device/access-request",
   ],
 };

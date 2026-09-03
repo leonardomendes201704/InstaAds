@@ -1,6 +1,7 @@
 "use client";
 
 import { base64ToBlobUrl, preparePhotoForApi } from "@/lib/image-utils";
+import { getDeviceHeaders } from "@/lib/device/client";
 import type { GeneratedAd } from "@/lib/types";
 import { create } from "zustand";
 import type {
@@ -23,6 +24,7 @@ interface WizardState {
   isSuggesting: boolean;
   error: string | null;
   quotaExceeded: boolean;
+  deviceAccessBlocked: boolean;
 
   setStep: (step: WizardStep) => void;
   nextStep: () => void;
@@ -55,6 +57,7 @@ const initialState = {
   isSuggesting: false,
   error: null,
   quotaExceeded: false,
+  deviceAccessBlocked: false,
 };
 
 const defaultLayout = {
@@ -101,12 +104,12 @@ export const useWizardStore = create<WizardState>((set, get) => ({
   setIsGenerating: (isGenerating) => set({ isGenerating }),
   setIsSuggesting: (isSuggesting) => set({ isSuggesting }),
   setError: (error) =>
-    set(error ? { error } : { error: null, quotaExceeded: false }),
+    set(error ? { error } : { error: null, quotaExceeded: false, deviceAccessBlocked: false }),
   setQuotaExceeded: (quotaExceeded) => set({ quotaExceeded }),
 
   suggestText: async () => {
     const { adStyle, adCategory, publishTarget } = get();
-    set({ isSuggesting: true, error: null, quotaExceeded: false });
+    set({ isSuggesting: true, error: null, quotaExceeded: false, deviceAccessBlocked: false });
 
     try {
       const response = await fetch("/api/suggest-text", {
@@ -139,14 +142,17 @@ export const useWizardStore = create<WizardState>((set, get) => ({
 
     if (!photo) return;
 
-    set({ isGenerating: true, error: null, quotaExceeded: false });
+    set({ isGenerating: true, error: null, quotaExceeded: false, deviceAccessBlocked: false });
 
     try {
       const prepared = await preparePhotoForApi(photo);
 
       const response = await fetch("/api/generate-ad", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...getDeviceHeaders(),
+        },
         body: JSON.stringify({
           mainMessage,
           adStyle,
@@ -171,18 +177,33 @@ export const useWizardStore = create<WizardState>((set, get) => ({
         code?: string;
         usage?: number;
         limit?: number;
+        canRequestAccess?: boolean;
       };
 
       if (!response.ok) {
         if (response.status === 402 && data.code === "QUOTA_EXCEEDED") {
           set({
             quotaExceeded: true,
+            deviceAccessBlocked: false,
             error:
               data.error ??
               `Limite mensal atingido (${data.usage ?? "?"}/${data.limit ?? "?"}).`,
           });
           return;
         }
+
+        if (
+          response.status === 403 &&
+          (data.code === "DEVICE_LIMIT_EXCEEDED" || data.code === "DEVICE_MULTI_ACCOUNT")
+        ) {
+          set({
+            quotaExceeded: false,
+            deviceAccessBlocked: Boolean(data.canRequestAccess),
+            error: data.error ?? "Acesso bloqueado neste dispositivo.",
+          });
+          return;
+        }
+
         throw new Error(data.error ?? "Erro ao gerar anúncio.");
       }
 

@@ -10,6 +10,7 @@ import {
   LogOut,
   Mail,
   Settings,
+  Shield,
   Tag,
   Users,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/admin/activity", label: "Atividades", icon: Activity },
   { href: "/admin/plans", label: "Planos", icon: CreditCard },
   { href: "/admin/promotions", label: "Promoções", icon: Tag },
+  { href: "/admin/device-access", label: "Acesso dispositivo", icon: Shield },
   { href: "/admin/emails", label: "E-mails", icon: Mail },
   { href: "/admin/settings", label: "Configurações", icon: Settings },
 ];

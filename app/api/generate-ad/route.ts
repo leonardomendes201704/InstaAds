@@ -5,6 +5,16 @@ import {
   incrementGenerationUsage,
   QuotaExceededError,
 } from "@/lib/billing/usage";
+import {
+  assertDeviceCanGenerate,
+  DeviceIdRequiredError,
+  DeviceLimitExceededError,
+  DeviceMultiAccountError,
+  incrementDeviceUsage,
+  registerDeviceUser,
+  shouldIncrementDeviceUsage,
+} from "@/lib/device/limits";
+import { getDeviceIdFromRequest } from "@/lib/device/request";
 import type { AdCategory, AdStyle, PublishTarget } from "@/lib/types";
 import { sendQuotaReachedEmail } from "@/lib/email/send";
 import { generateAdArtworks } from "@/lib/gemini";
@@ -23,7 +33,13 @@ export async function POST(request: Request) {
     userId = user.id;
     userEmail = user.email;
 
+    const deviceId = getDeviceIdFromRequest(request);
+    if (deviceId) {
+      await registerDeviceUser(deviceId, user.id);
+    }
+
     await assertCanGenerate(user.id);
+    await assertDeviceCanGenerate(user.id, deviceId);
 
     const body = (await request.json()) as {
       mainMessage: string;
@@ -53,6 +69,9 @@ export async function POST(request: Request) {
     });
 
     await incrementGenerationUsage(user.id);
+    if (deviceId && (await shouldIncrementDeviceUsage(user.id))) {
+      await incrementDeviceUsage(deviceId);
+    }
 
     let stored = false;
     let storageError: string | undefined;
@@ -133,6 +152,37 @@ export async function POST(request: Request) {
           planSlug: error.plan.slug,
         },
         { status: 402 },
+      );
+    }
+
+    if (error instanceof DeviceLimitExceededError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          usage: error.usage,
+          limit: error.limit,
+          canRequestAccess: true,
+        },
+        { status: 403 },
+      );
+    }
+
+    if (error instanceof DeviceMultiAccountError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          canRequestAccess: true,
+        },
+        { status: 403 },
+      );
+    }
+
+    if (error instanceof DeviceIdRequiredError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 400 },
       );
     }
 

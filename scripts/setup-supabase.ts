@@ -6,7 +6,8 @@
  * Pré-requisitos:
  * 1. Rodar supabase/migrations/001_initial.sql no SQL Editor do Supabase
  * 2. Rodar supabase/migrations/002_billing.sql (planos, billing, settings)
- * 3. Definir no .env.local:
+ * 3. Rodar supabase/migrations/003_device_limits.sql (limite por dispositivo)
+ * 4. Definir no .env.local:
  *    NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
  *    SUPABASE_SERVICE_ROLE_KEY=eyJ... (Settings → API → service_role)
  *
@@ -83,6 +84,18 @@ async function main() {
     console.warn("  para habilitar planos, limites e billing.\n");
   } else {
     console.log("✓ Billing OK (tabela plans existe)");
+  }
+
+  const { error: deviceError } = await supabase
+    .from("device_usage")
+    .select("device_id")
+    .limit(1);
+
+  if (deviceError) {
+    console.warn("\n⚠ Tabelas de dispositivo não encontradas.");
+    console.warn("  Rode supabase/migrations/003_device_limits.sql no SQL Editor.\n");
+  } else {
+    console.log("✓ Device limits OK");
   }
 
   const { data: buckets, error: listError } =

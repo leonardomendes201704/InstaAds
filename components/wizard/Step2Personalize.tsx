@@ -7,6 +7,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { OptionCard } from "@/components/ui/OptionCard";
+import { DeviceAccessRequestButton } from "@/components/device/DeviceAccessRequestButton";
 import { WizardShell } from "@/components/wizard/WizardShell";
 import type { AdStyle } from "@/lib/types";
 import { useWizardStore } from "@/stores/wizard-store";
@@ -35,6 +36,7 @@ export function Step2Personalize() {
     isSuggesting,
     error,
     quotaExceeded,
+    deviceAccessBlocked,
     setAdStyle,
     setMainMessage,
     setStep,
@@ -144,6 +146,7 @@ export function Step2Personalize() {
                   Ver planos e fazer upgrade
                 </Link>
               ) : null}
+              {deviceAccessBlocked ? <DeviceAccessRequestButton /> : null}
             </div>
           ) : null}
         </div>
