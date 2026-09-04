@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -20,17 +21,24 @@ export function UserAccountButton() {
 
   return (
     <div className="flex items-center gap-1">
-      {user.image ? (
-        <img
-          src={user.image}
-          alt={user.name ?? "Usuário"}
-          className="h-9 w-9 rounded-full border border-black/10 object-cover"
-        />
-      ) : (
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-xs font-semibold text-foreground">
-          {initials}
-        </span>
-      )}
+      <Link
+        href="/perfil"
+        className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-purple"
+        aria-label="Meu perfil"
+        title="Meu perfil"
+      >
+        {user.image ? (
+          <img
+            src={user.image}
+            alt={user.name ?? "Usuário"}
+            className="h-9 w-9 rounded-full border border-black/10 object-cover"
+          />
+        ) : (
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-surface text-xs font-semibold text-foreground">
+            {initials}
+          </span>
+        )}
+      </Link>
       <button
         type="button"
         onClick={() => void signOut({ callbackUrl: "/" })}

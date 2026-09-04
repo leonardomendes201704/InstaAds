@@ -33,7 +33,7 @@ export function UsageBadge() {
 
   return (
     <Link
-      href="/planos"
+      href="/perfil"
       className={`mb-2 block rounded-xl border px-3 py-2 text-center text-xs transition-colors ${
         warn
           ? "border-amber-200 bg-amber-50 text-amber-900"
