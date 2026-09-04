@@ -73,6 +73,7 @@ export async function GET(request: Request) {
         adStyle: gen.adStyle,
         publishTarget: gen.publishTarget,
         feedUrl: userMediaUrl(gen.generatedArtUrl),
+        storiesUrl: userMediaUrl(gen.generatedStoriesUrl),
         originalUrl: userMediaUrl(gen.originalPhotoUrl),
       })),
       deviceAccess: {

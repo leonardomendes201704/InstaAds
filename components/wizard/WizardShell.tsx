@@ -17,6 +17,7 @@ interface WizardShellProps {
   footer?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
+  scrollable?: boolean;
 }
 
 export function WizardShell({
@@ -29,6 +30,7 @@ export function WizardShell({
   footer,
   children,
   className,
+  scrollable = false,
 }: WizardShellProps) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-white">
@@ -67,7 +69,8 @@ export function WizardShell({
 
       <main
         className={cn(
-          "min-h-0 flex-1 overflow-hidden px-4",
+          "min-h-0 flex-1 px-4",
+          scrollable ? "overflow-y-auto overscroll-contain" : "overflow-hidden",
           className,
         )}
       >

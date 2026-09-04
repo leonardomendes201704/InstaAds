@@ -182,3 +182,12 @@ export function downloadBlobUrl(url: string, filename: string) {
   link.download = filename;
   link.click();
 }
+
+export async function downloadMediaUrl(url: string, filename: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Falha ao baixar a arte.");
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  downloadBlobUrl(blobUrl, filename);
+  URL.revokeObjectURL(blobUrl);
+}

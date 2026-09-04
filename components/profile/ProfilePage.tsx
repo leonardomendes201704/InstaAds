@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { WizardShell } from "@/components/wizard/WizardShell";
+import { GenerationArtLightbox } from "@/components/profile/GenerationArtLightbox";
 import { siteConfig } from "@/lib/site";
 
 interface ProfileData {
@@ -41,6 +42,7 @@ interface ProfileData {
     headline: string;
     createdAt: string;
     feedUrl?: string;
+    storiesUrl?: string;
     originalUrl?: string;
   }>;
   deviceAccess: {
@@ -84,6 +86,9 @@ export function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [selectedGeneration, setSelectedGeneration] = useState<
+    ProfileData["recentGenerations"][number] | null
+  >(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,6 +144,7 @@ export function ProfilePage() {
       subtitle="Conta, plano e histórico de gerações."
       showBack={false}
       showBrand
+      scrollable
       footer={
         <Link
           href="/"
@@ -306,32 +312,44 @@ export function ProfilePage() {
                 </div>
               ) : (
                 <div className="mt-4 grid grid-cols-2 gap-3">
-                  {data.recentGenerations.map((gen) => (
-                    <div
-                      key={gen.id}
-                      className="overflow-hidden rounded-xl border border-black/10 bg-surface"
-                    >
-                      {gen.feedUrl ? (
-                        <img
-                          src={gen.feedUrl}
-                          alt={gen.headline}
-                          className="aspect-[4/5] w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex aspect-[4/5] items-center justify-center text-xs text-muted">
-                          Sem preview
+                  {data.recentGenerations.map((gen) => {
+                    const previewUrl = gen.feedUrl ?? gen.storiesUrl;
+                    const canOpen = Boolean(previewUrl);
+
+                    return (
+                      <div
+                        key={gen.id}
+                        className="overflow-hidden rounded-xl border border-black/10 bg-surface"
+                      >
+                        {canOpen ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedGeneration(gen)}
+                            className="block w-full cursor-pointer text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-purple"
+                            aria-label={`Abrir arte: ${gen.headline}`}
+                          >
+                            <img
+                              src={previewUrl}
+                              alt={gen.headline}
+                              className="aspect-[4/5] w-full object-cover"
+                            />
+                          </button>
+                        ) : (
+                          <div className="flex aspect-[4/5] items-center justify-center text-xs text-muted">
+                            Sem preview
+                          </div>
+                        )}
+                        <div className="p-2">
+                          <p className="truncate text-xs font-medium text-foreground">
+                            {gen.headline}
+                          </p>
+                          <p className="text-[10px] text-muted">
+                            {formatDateTime(gen.createdAt)}
+                          </p>
                         </div>
-                      )}
-                      <div className="p-2">
-                        <p className="truncate text-xs font-medium text-foreground">
-                          {gen.headline}
-                        </p>
-                        <p className="text-[10px] text-muted">
-                          {formatDateTime(gen.createdAt)}
-                        </p>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -358,6 +376,16 @@ export function ProfilePage() {
           </>
         ) : null}
       </div>
+
+      {selectedGeneration ? (
+        <GenerationArtLightbox
+          headline={selectedGeneration.headline}
+          createdAtLabel={formatDateTime(selectedGeneration.createdAt)}
+          feedUrl={selectedGeneration.feedUrl}
+          storiesUrl={selectedGeneration.storiesUrl}
+          onClose={() => setSelectedGeneration(null)}
+        />
+      ) : null}
     </WizardShell>
   );
 }
