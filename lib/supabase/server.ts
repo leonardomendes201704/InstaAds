@@ -1,31 +1,37 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { GENERATIONS_BUCKET } from "@/lib/object-storage";
 
 let adminClient: SupabaseClient | null = null;
 
-export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+function getDatabaseUrl(): string | undefined {
+  return (
+    process.env.SUPABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
   );
 }
 
+export function isSupabaseConfigured(): boolean {
+  return Boolean(getDatabaseUrl() && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 export function getSupabaseAdmin(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = getDatabaseUrl();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !key) {
     throw new Error(
-      "Supabase não configurado (NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).",
+      "Banco não configurado (SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).",
     );
   }
 
   if (!adminClient) {
     adminClient = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
+      db: { schema: "public" },
     });
   }
 
   return adminClient;
 }
 
-export const GENERATIONS_BUCKET = "generations";
+export { GENERATIONS_BUCKET };

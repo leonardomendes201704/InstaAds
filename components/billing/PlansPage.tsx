@@ -101,6 +101,7 @@ export function PlansPage() {
       subtitle="Escolha o plano ideal para o seu volume de anúncios."
       showBack={false}
       showBrand
+      scrollable
       footer={
         <Link
           href="/"

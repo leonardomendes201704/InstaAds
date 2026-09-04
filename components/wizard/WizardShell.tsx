@@ -5,6 +5,7 @@ import { ProgressDots } from "@/components/ui/ProgressDots";
 import { UserAccountButton } from "@/components/auth/UserAccountButton";
 import { UsageBadge } from "@/components/billing/UsageBadge";
 import { LogoIcon } from "@/components/brand/Logo";
+import { MetaDisclaimer } from "@/components/brand/MetaDisclaimer";
 import { cn } from "@/lib/utils";
 
 interface WizardShellProps {
@@ -80,6 +81,10 @@ export function WizardShell({
       {footer ? (
         <footer className="shrink-0 space-y-3 px-4 pb-safe pt-2">{footer}</footer>
       ) : null}
+
+      <div className="shrink-0 px-4 pb-safe pt-1">
+        <MetaDisclaimer />
+      </div>
     </div>
   );
 }

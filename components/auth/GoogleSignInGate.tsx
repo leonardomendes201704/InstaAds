@@ -4,6 +4,7 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { Logo } from "@/components/brand/Logo";
+import { MetaDisclaimer } from "@/components/brand/MetaDisclaimer";
 
 function GoogleIcon() {
   return (
@@ -97,6 +98,8 @@ export function GoogleSignInGate() {
           .
         </p>
       </div>
+
+      <MetaDisclaimer className="absolute bottom-0 left-0 right-0 z-10 px-6 pb-safe pt-2" />
     </div>
   );
 }

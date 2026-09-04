@@ -25,13 +25,15 @@ interface LogoProps {
 }
 
 export function Logo({ height = 36, className }: LogoProps) {
+  const width = Math.round(height * (188 / 48));
+
   return (
     <Image
       src="/logo.svg"
       alt="InstaAds"
-      width={Math.round(height * 4.6)}
+      width={width}
       height={height}
-      className={cn("h-auto w-auto", className)}
+      className={cn("mx-auto block h-auto w-auto", className)}
       priority
     />
   );

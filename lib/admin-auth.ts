@@ -9,6 +9,10 @@ function getAdminPassword(): string | undefined {
   return process.env.ADMIN_PASSWORD?.trim() || undefined;
 }
 
+function useSecureCookies(): boolean {
+  return process.env.AUTH_URL?.startsWith("https://") ?? false;
+}
+
 function signPayload(payload: string): string {
   const secret = getAdminPassword();
   if (!secret) throw new Error("ADMIN_PASSWORD não configurado.");
@@ -71,7 +75,7 @@ export function attachAdminCookie(response: NextResponse): void {
   response.cookies.set(ADMIN_COOKIE, buildSessionToken(), {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecureCookies(),
     maxAge: SESSION_TTL_SECONDS,
     path: "/",
   });
@@ -81,7 +85,7 @@ export function clearAdminCookie(response: NextResponse): void {
   response.cookies.set(ADMIN_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecureCookies(),
     maxAge: 0,
     path: "/",
   });

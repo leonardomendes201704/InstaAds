@@ -9,11 +9,8 @@ import {
 } from "@/lib/db/generations";
 import type { AdminStats, StoredGeneration } from "@/lib/db/types";
 import { upsertProfile, uploadGenerationFile } from "@/lib/db/profiles";
-import {
-  GENERATIONS_BUCKET,
-  getSupabaseAdmin,
-  isSupabaseConfigured,
-} from "@/lib/supabase/server";
+import { getObjectStream, isObjectStorageConfigured } from "@/lib/object-storage";
+import { isSupabaseConfigured } from "@/lib/supabase/server";
 
 export type { AdminStats, StoredGeneration };
 export {
@@ -24,7 +21,7 @@ export {
 };
 
 export function isStorageConfigured(): boolean {
-  return isSupabaseConfigured();
+  return isSupabaseConfigured() && isObjectStorageConfigured();
 }
 
 function storagePath(userId: string, generationId: string, filename: string) {
@@ -55,16 +52,12 @@ export function isValidGenerationPath(path: string): boolean {
 }
 
 export async function getPrivateBlob(pathname: string) {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.storage
-    .from(GENERATIONS_BUCKET)
-    .download(pathname);
-
-  if (error || !data) return null;
+  const result = await getObjectStream(pathname);
+  if (!result) return null;
 
   return {
-    stream: data.stream(),
-    blob: { contentType: data.type || "application/octet-stream" },
+    stream: result.stream,
+    blob: { contentType: result.contentType },
     statusCode: 200 as const,
   };
 }
@@ -180,6 +173,7 @@ export function pathnameFromBlobUrl(url: string): string | null {
 }
 
 export async function generationExists(id: string): Promise<boolean> {
+  const { getSupabaseAdmin } = await import("@/lib/supabase/server");
   const supabase = getSupabaseAdmin();
   const { count, error } = await supabase
     .from("generations")

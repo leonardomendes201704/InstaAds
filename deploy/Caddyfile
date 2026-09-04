@@ -1,0 +1,3 @@
+insta-ads.online, www.insta-ads.online {
+	reverse_proxy app:3000
+}

@@ -1,8 +1,10 @@
 import {
-  GENERATIONS_BUCKET,
-  getSupabaseAdmin,
-  isSupabaseConfigured,
-} from "@/lib/supabase/server";
+  createPresignedObjectUrl,
+  downloadObject,
+  isObjectStorageConfigured,
+  uploadObject,
+} from "@/lib/object-storage";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { Profile, ProfileRow } from "@/lib/db/types";
 
 export { isSupabaseConfigured };
@@ -83,6 +85,33 @@ export async function getProfile(userId: string): Promise<Profile | null> {
 
   if (error) throw error;
   return data ? mapProfile(data as ProfileRow) : null;
+}
+
+/** Remove perfis antigos criados com UUID antes da correção do OAuth. */
+export async function removeDuplicateProfilesForEmail(
+  email: string,
+  keepId: string,
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", email);
+
+  if (error) throw error;
+
+  const staleIds = (data ?? [])
+    .map((row) => row.id)
+    .filter((id) => id !== keepId);
+
+  if (staleIds.length === 0) return;
+
+  const { error: deleteError } = await supabase
+    .from("profiles")
+    .delete()
+    .in("id", staleIds);
+
+  if (deleteError) throw deleteError;
 }
 
 export async function listProfiles(options?: {
@@ -180,37 +209,25 @@ export async function uploadGenerationFile(
   buffer: Buffer,
   contentType: string,
 ): Promise<void> {
-  const supabase = getSupabaseAdmin();
-  const { error } = await supabase.storage
-    .from(GENERATIONS_BUCKET)
-    .upload(path, buffer, { contentType, upsert: true });
+  if (!isObjectStorageConfigured()) {
+    throw new Error("Object storage não configurado.");
+  }
 
-  if (error) throw error;
+  await uploadObject(path, buffer, contentType);
 }
 
 export async function downloadGenerationFile(path: string): Promise<{
   data: Blob;
   contentType: string;
 } | null> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.storage
-    .from(GENERATIONS_BUCKET)
-    .download(path);
-
-  if (error || !data) return null;
-
-  return { data, contentType: data.type || "application/octet-stream" };
+  if (!isObjectStorageConfigured()) return null;
+  return downloadObject(path);
 }
 
 export async function createSignedMediaUrl(
   path: string,
   expiresIn = 3600,
 ): Promise<string | null> {
-  const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase.storage
-    .from(GENERATIONS_BUCKET)
-    .createSignedUrl(path, expiresIn);
-
-  if (error || !data?.signedUrl) return null;
-  return data.signedUrl;
+  if (!isObjectStorageConfigured()) return null;
+  return createPresignedObjectUrl(path, expiresIn);
 }

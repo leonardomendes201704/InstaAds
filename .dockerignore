@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+!.env.local.example
+deploy/.env
+*.md
+.planning
+.cursor
+terminals

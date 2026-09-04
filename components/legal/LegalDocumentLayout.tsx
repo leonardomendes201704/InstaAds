@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Logo } from "@/components/brand/Logo";
+import { MetaDisclaimer } from "@/components/brand/MetaDisclaimer";
 import { siteConfig } from "@/lib/site";
 
 interface LegalDocumentLayoutProps {
@@ -38,7 +39,8 @@ export function LegalDocumentLayout({
       </main>
 
       <footer className="border-t border-black/10 px-4 py-6 text-center text-xs text-muted">
-        <p>
+        <MetaDisclaimer />
+        <p className="mt-3">
           © {new Date().getFullYear()} {siteConfig.name}. Todos os direitos
           reservados.
         </p>
