@@ -18,12 +18,15 @@ Código central: [`lib/gemini.ts`](../../lib/gemini.ts)
 
 ## Modelos
 
-| Variável | Padrão | Etapa |
-|----------|--------|-------|
-| `GEMINI_TEXT_MODEL` | `gemini-3.6-flash` | Copy JSON |
-| `GEMINI_IMAGE_MODEL` | `gemini-2.5-flash-image` | Arte feed/stories |
+Configuráveis em `/admin/settings` (seção **Google AI (Gemini)**), persistidos na tabela `platform_settings`. Resolução: **banco → env var → padrão**.
 
-API key: `GOOGLE_AI_API_KEY` (Google AI Studio).
+| Chave no banco | Env var (fallback) | Padrão | Etapa |
+|----------------|--------------------|--------|-------|
+| `gemini_text_model` | `GEMINI_TEXT_MODEL` | `gemini-3.6-flash` | Copy JSON |
+| `gemini_image_model` | `GEMINI_IMAGE_MODEL` | `gemini-2.5-flash-image` | Arte feed/stories |
+| `google_ai_api_key` | `GOOGLE_AI_API_KEY` / `GEMINI_API_KEY` | — | Autenticação |
+
+A leitura acontece por requisição em [`getAiSettings()`](../../lib/db/settings.ts), então trocar de modelo pelo admin passa a valer na geração seguinte — sem redeploy. O client `GoogleGenAI` fica em cache e só é recriado quando a API key muda.
 
 ## Etapa 1 — Copy
 

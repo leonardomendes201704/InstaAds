@@ -41,6 +41,9 @@ export async function PUT(request: Request) {
       "stripe_webhook_secret",
       "resend_api_key",
       "email_from",
+      "google_ai_api_key",
+      "gemini_text_model",
+      "gemini_image_model",
     ];
 
     const patch: Partial<Record<PlatformSettingKey, string>> = {};

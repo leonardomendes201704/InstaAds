@@ -25,9 +25,9 @@ Template: [`deploy/.env.example`](../../deploy/.env.example)
 | `ADMIN_PASSWORD` | Sim | Senha do painel `/admin` |
 | `AUTH_GOOGLE_ID` | Sim* | OAuth Google client ID |
 | `AUTH_GOOGLE_SECRET` | Sim* | OAuth Google client secret |
-| `GOOGLE_AI_API_KEY` | Sim* | Google AI Studio (Gemini) |
-| `GEMINI_TEXT_MODEL` | Não | Padrão: `gemini-3.6-flash` |
-| `GEMINI_IMAGE_MODEL` | Não | Padrão: `gemini-2.5-flash-image` |
+| `GOOGLE_AI_API_KEY` | Sim* | Google AI Studio (Gemini) — ou via admin |
+| `GEMINI_TEXT_MODEL` | Não | Padrão: `gemini-3.6-flash` — ou via admin |
+| `GEMINI_IMAGE_MODEL` | Não | Padrão: `gemini-2.5-flash-image` — ou via admin |
 | `STRIPE_SECRET_KEY` | Não | Stripe (ou via admin) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Não | Stripe publishable |
 | `STRIPE_WEBHOOK_SECRET` | Não | Webhook Stripe |
@@ -65,7 +65,15 @@ http://localhost:3000/api/auth/callback/google
 
 ## Configuração via admin
 
-Chaves Stripe e Resend também podem ser salvas em `platform_settings` pelo painel `/admin/settings`, sobrescrevendo env quando configuradas.
+Chaves Stripe, Resend e Google AI também podem ser salvas em `platform_settings` pelo painel `/admin/settings`, sobrescrevendo env quando configuradas.
+
+| Seção do admin | Chaves em `platform_settings` |
+|----------------|-------------------------------|
+| Stripe | `stripe_secret_key`, `stripe_publishable_key`, `stripe_webhook_secret` |
+| E-mail (Resend) | `resend_api_key`, `email_from` |
+| Google AI (Gemini) | `google_ai_api_key`, `gemini_text_model`, `gemini_image_model` |
+
+Valores salvos no banco valem imediatamente, sem redeploy do container. Campo em branco no formulário mantém o valor atual.
 
 ## Gerar JWT service role
 

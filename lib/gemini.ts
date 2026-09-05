@@ -19,25 +19,30 @@ import {
   publishLabels,
   styleLabels,
 } from "@/lib/ad-styles";
+import { getAiSettings } from "@/lib/db/settings";
 
-const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL ?? "gemini-3.6-flash";
-const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL ?? "gemini-2.5-flash-image";
+let cachedClient: GoogleGenAI | null = null;
+let cachedApiKey = "";
 
-function getApiKey(): string {
-  const apiKey =
-    process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY;
+async function getAiConfig(): Promise<{
+  ai: GoogleGenAI;
+  textModel: string;
+  imageModel: string;
+}> {
+  const { googleAiApiKey, geminiTextModel, geminiImageModel } = await getAiSettings();
 
-  if (!apiKey) {
+  if (!googleAiApiKey) {
     throw new Error(
-      "GOOGLE_AI_API_KEY não configurada. Adicione sua chave do Google AI Studio.",
+      "Chave da Google AI não configurada. Defina em /admin/settings ou na variável GOOGLE_AI_API_KEY.",
     );
   }
 
-  return apiKey;
-}
+  if (!cachedClient || cachedApiKey !== googleAiApiKey) {
+    cachedClient = new GoogleGenAI({ apiKey: googleAiApiKey });
+    cachedApiKey = googleAiApiKey;
+  }
 
-function getClient() {
-  return new GoogleGenAI({ apiKey: getApiKey() });
+  return { ai: cachedClient, textModel: geminiTextModel, imageModel: geminiImageModel };
 }
 
 export interface GeneratedAdImage {
@@ -98,10 +103,10 @@ async function generateAdArtworkCopy(input: {
   adCategory: AdCategory;
   publishTarget: PublishTarget;
 }): Promise<{ copy: AdArtworkCopy; usage: AiUsageCall }> {
-  const ai = getClient();
+  const { ai, textModel } = await getAiConfig();
 
   const response = await ai.models.generateContent({
-    model: TEXT_MODEL,
+    model: textModel,
     contents: [
       {
         role: "user",
@@ -161,7 +166,7 @@ Contexto:
       cta: parsed.cta?.trim() || defaultCta[input.adCategory],
     },
     usage: estimateCallCost({
-      model: TEXT_MODEL,
+      model: textModel,
       purpose: "copy",
       usage: extractUsageMetadata(response),
     }),
@@ -204,7 +209,7 @@ async function generateAdArtworkVariant(input: {
   aspectRatio: "4:5" | "9:16";
   purpose: "feed-image" | "stories-image";
 }): Promise<{ image: GeneratedAdImage; usage: AiUsageCall }> {
-  const ai = getClient();
+  const { ai, imageModel } = await getAiConfig();
   const prompt = buildAdArtPrompt({
     copy: input.copy,
     adCategory: input.adCategory,
@@ -214,7 +219,7 @@ async function generateAdArtworkVariant(input: {
   });
 
   const response = await ai.models.generateContent({
-    model: IMAGE_MODEL,
+    model: imageModel,
     contents: [
       {
         role: "user",
@@ -251,7 +256,7 @@ async function generateAdArtworkVariant(input: {
   return {
     image,
     usage: estimateCallCost({
-      model: IMAGE_MODEL,
+      model: imageModel,
       purpose: input.purpose,
       usage: extractUsageMetadata(response),
     }),
@@ -319,10 +324,10 @@ export async function suggestAdMessage(input: {
   adCategory: AdCategory;
   publishTarget: PublishTarget;
 }): Promise<string> {
-  const ai = getClient();
+  const { ai, textModel } = await getAiConfig();
 
   const response = await ai.models.generateContent({
-    model: TEXT_MODEL,
+    model: textModel,
     contents: `Você cria frases curtas de anúncio para Instagram em português do Brasil. Responda apenas com a frase, sem aspas. Use português correto, sem inglês ou espanhol.
 
 Crie uma mensagem principal curta (máx. 60 caracteres) para anunciar um ${categoryLabels[input.adCategory]} com estilo ${styleLabels[input.adStyle]} para ${publishLabels[input.publishTarget]}.`,
@@ -361,10 +366,10 @@ export async function generateAdCopy(input: {
   adCategory: AdCategory;
   publishTarget: PublishTarget;
 }): Promise<GeneratedAdCopy> {
-  const ai = getClient();
+  const { ai, textModel } = await getAiConfig();
 
   const response = await ai.models.generateContent({
-    model: TEXT_MODEL,
+    model: textModel,
     contents: `Gere copy para anúncio Instagram em português do Brasil. PROIBIDO inglês ou espanhol.
 Mensagem principal: ${input.mainMessage}
 Categoria: ${categoryLabels[input.adCategory]}

@@ -7,7 +7,10 @@ type SettingKey =
   | "stripe_publishable_key"
   | "stripe_webhook_secret"
   | "resend_api_key"
-  | "email_from";
+  | "email_from"
+  | "google_ai_api_key"
+  | "gemini_text_model"
+  | "gemini_image_model";
 
 const labels: Record<SettingKey, string> = {
   stripe_secret_key: "Stripe Secret Key (sk_...)",
@@ -15,23 +18,25 @@ const labels: Record<SettingKey, string> = {
   stripe_webhook_secret: "Stripe Webhook Secret (whsec_...)",
   resend_api_key: "Resend API Key (re_...)",
   email_from: "E-mail remetente (ex: InstaAds <noreply@dominio.com>)",
+  google_ai_api_key: "Chave da API Google AI Studio",
+  gemini_text_model: "Modelo de texto (ex: gemini-3.6-flash)",
+  gemini_image_model: "Modelo de imagem (ex: gemini-2.5-flash-image)",
+};
+
+const emptyValues: Record<SettingKey, string> = {
+  stripe_secret_key: "",
+  stripe_publishable_key: "",
+  stripe_webhook_secret: "",
+  resend_api_key: "",
+  email_from: "",
+  google_ai_api_key: "",
+  gemini_text_model: "",
+  gemini_image_model: "",
 };
 
 export function AdminSettingsPage() {
-  const [values, setValues] = useState<Record<SettingKey, string>>({
-    stripe_secret_key: "",
-    stripe_publishable_key: "",
-    stripe_webhook_secret: "",
-    resend_api_key: "",
-    email_from: "",
-  });
-  const [masked, setMasked] = useState<Record<SettingKey, string>>({
-    stripe_secret_key: "",
-    stripe_publishable_key: "",
-    stripe_webhook_secret: "",
-    resend_api_key: "",
-    email_from: "",
-  });
+  const [values, setValues] = useState<Record<SettingKey, string>>(emptyValues);
+  const [masked, setMasked] = useState<Record<SettingKey, string>>(emptyValues);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -79,13 +84,7 @@ export function AdminSettingsPage() {
       const data = (await res.json()) as { error?: string; settings?: { masked: Record<SettingKey, string> } };
       if (!res.ok) throw new Error(data.error ?? "Erro ao salvar.");
       if (data.settings?.masked) setMasked(data.settings.masked);
-      setValues({
-        stripe_secret_key: "",
-        stripe_publishable_key: "",
-        stripe_webhook_secret: "",
-        resend_api_key: "",
-        email_from: "",
-      });
+      setValues(emptyValues);
       setMessage("Configurações salvas.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
@@ -98,8 +97,8 @@ export function AdminSettingsPage() {
     <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
       <h1 className="text-3xl font-semibold">Configurações</h1>
       <p className="mt-1 text-sm text-muted">
-        Chaves Stripe e Resend. Deixe em branco para manter o valor atual. Env vars
-        (.env) continuam como fallback.
+        Chaves Stripe, Resend e Google AI. Deixe em branco para manter o valor atual.
+        Env vars (.env) continuam como fallback.
       </p>
 
       {loading ? (
@@ -147,6 +146,34 @@ export function AdminSettingsPage() {
                 )}
                 <input
                   type={key === "email_from" ? "text" : "password"}
+                  value={values[key]}
+                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                  placeholder="Novo valor (opcional)"
+                  className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
+                  autoComplete="off"
+                />
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded-2xl border border-black/10 bg-white p-5">
+            <h2 className="font-semibold text-foreground">Google AI (Gemini)</h2>
+            <p className="mt-1 text-xs text-muted">
+              Modelos usados para gerar a copy e a arte dos anúncios. A alteração vale
+              na próxima geração, sem redeploy.
+            </p>
+            {(
+              ["google_ai_api_key", "gemini_text_model", "gemini_image_model"] as SettingKey[]
+            ).map((key) => (
+              <div key={key} className="mt-4">
+                <label className="mb-1 block text-sm font-medium">{labels[key]}</label>
+                {masked[key] ? (
+                  <p className="mb-1 font-mono text-xs text-muted">Atual: {masked[key]}</p>
+                ) : (
+                  <p className="mb-1 text-xs text-amber-700">Não configurado</p>
+                )}
+                <input
+                  type={key === "google_ai_api_key" ? "password" : "text"}
                   value={values[key]}
                   onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
                   placeholder="Novo valor (opcional)"

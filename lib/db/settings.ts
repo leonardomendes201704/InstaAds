@@ -5,12 +5,19 @@ export type PlatformSettingKey =
   | "stripe_publishable_key"
   | "stripe_webhook_secret"
   | "resend_api_key"
-  | "email_from";
+  | "email_from"
+  | "google_ai_api_key"
+  | "gemini_text_model"
+  | "gemini_image_model";
+
+export const DEFAULT_GEMINI_TEXT_MODEL = "gemini-3.6-flash";
+export const DEFAULT_GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
 
 const SECRET_KEYS: PlatformSettingKey[] = [
   "stripe_secret_key",
   "stripe_webhook_secret",
   "resend_api_key",
+  "google_ai_api_key",
 ];
 
 export interface PlatformSettings {
@@ -19,6 +26,9 @@ export interface PlatformSettings {
   stripeWebhookSecret: string;
   resendApiKey: string;
   emailFrom: string;
+  googleAiApiKey: string;
+  geminiTextModel: string;
+  geminiImageModel: string;
 }
 
 function envFallback(key: PlatformSettingKey): string {
@@ -33,6 +43,12 @@ function envFallback(key: PlatformSettingKey): string {
       return process.env.RESEND_API_KEY ?? "";
     case "email_from":
       return process.env.EMAIL_FROM ?? "";
+    case "google_ai_api_key":
+      return process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY ?? "";
+    case "gemini_text_model":
+      return process.env.GEMINI_TEXT_MODEL ?? DEFAULT_GEMINI_TEXT_MODEL;
+    case "gemini_image_model":
+      return process.env.GEMINI_IMAGE_MODEL ?? DEFAULT_GEMINI_IMAGE_MODEL;
     default:
       return "";
   }
@@ -64,14 +80,25 @@ export async function getSetting(key: PlatformSettingKey): Promise<string> {
 }
 
 export async function getPlatformSettings(): Promise<PlatformSettings> {
-  const [stripeSecretKey, stripePublishableKey, stripeWebhookSecret, resendApiKey, emailFrom] =
-    await Promise.all([
-      getSetting("stripe_secret_key"),
-      getSetting("stripe_publishable_key"),
-      getSetting("stripe_webhook_secret"),
-      getSetting("resend_api_key"),
-      getSetting("email_from"),
-    ]);
+  const [
+    stripeSecretKey,
+    stripePublishableKey,
+    stripeWebhookSecret,
+    resendApiKey,
+    emailFrom,
+    googleAiApiKey,
+    geminiTextModel,
+    geminiImageModel,
+  ] = await Promise.all([
+    getSetting("stripe_secret_key"),
+    getSetting("stripe_publishable_key"),
+    getSetting("stripe_webhook_secret"),
+    getSetting("resend_api_key"),
+    getSetting("email_from"),
+    getSetting("google_ai_api_key"),
+    getSetting("gemini_text_model"),
+    getSetting("gemini_image_model"),
+  ]);
 
   return {
     stripeSecretKey,
@@ -79,7 +106,30 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
     stripeWebhookSecret,
     resendApiKey,
     emailFrom,
+    googleAiApiKey,
+    geminiTextModel,
+    geminiImageModel,
   };
+}
+
+export interface AiSettings {
+  googleAiApiKey: string;
+  geminiTextModel: string;
+  geminiImageModel: string;
+}
+
+export async function getAiSettings(): Promise<AiSettings> {
+  const [googleAiApiKey, geminiTextModel, geminiImageModel] = await Promise.all([
+    getSetting("google_ai_api_key"),
+    getSetting("gemini_text_model"),
+    getSetting("gemini_image_model"),
+  ]);
+
+  return { googleAiApiKey, geminiTextModel, geminiImageModel };
+}
+
+export async function isAiConfigured(): Promise<boolean> {
+  return Boolean(await getSetting("google_ai_api_key"));
 }
 
 export async function getPlatformSettingsForAdmin(): Promise<
@@ -95,6 +145,9 @@ export async function getPlatformSettingsForAdmin(): Promise<
     "stripe_webhook_secret",
     "resend_api_key",
     "email_from",
+    "google_ai_api_key",
+    "gemini_text_model",
+    "gemini_image_model",
   ];
 
   const raw: Record<PlatformSettingKey, string> = {
@@ -103,6 +156,9 @@ export async function getPlatformSettingsForAdmin(): Promise<
     stripe_webhook_secret: settings.stripeWebhookSecret,
     resend_api_key: settings.resendApiKey,
     email_from: settings.emailFrom,
+    google_ai_api_key: settings.googleAiApiKey,
+    gemini_text_model: settings.geminiTextModel,
+    gemini_image_model: settings.geminiImageModel,
   };
 
   const masked = {} as Record<PlatformSettingKey, string>;
