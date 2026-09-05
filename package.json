@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "migrate:blob": "tsx scripts/migrate-blob-to-supabase.ts",
-    "setup:supabase": "tsx scripts/setup-supabase.ts"
+    "setup:supabase": "tsx scripts/setup-supabase.ts",
+    "vault:changelog": "tsx scripts/generate-vault-changelog.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1126.0",
