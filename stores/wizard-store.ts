@@ -3,6 +3,12 @@
 import { base64ToBlobUrl, preparePhotoForApi } from "@/lib/image-utils";
 import { getDeviceHeaders } from "@/lib/device/client";
 import type { GeneratedAd } from "@/lib/types";
+import {
+  clearWizardDraft,
+  draftToFile,
+  loadWizardDraft,
+  saveWizardDraft,
+} from "@/lib/wizard-draft";
 import { create } from "zustand";
 import type {
   AdCategory,
@@ -25,6 +31,7 @@ interface WizardState {
   error: string | null;
   quotaExceeded: boolean;
   deviceAccessBlocked: boolean;
+  isResuming: boolean;
 
   setStep: (step: WizardStep) => void;
   nextStep: () => void;
@@ -39,6 +46,8 @@ interface WizardState {
   setIsSuggesting: (value: boolean) => void;
   setError: (error: string | null) => void;
   setQuotaExceeded: (value: boolean) => void;
+  persistDraftForCheckout: () => Promise<void>;
+  resumeFromCheckout: () => Promise<void>;
   suggestText: () => Promise<void>;
   generateAd: () => Promise<void>;
   reset: () => void;
@@ -58,6 +67,7 @@ const initialState = {
   error: null,
   quotaExceeded: false,
   deviceAccessBlocked: false,
+  isResuming: false,
 };
 
 const defaultLayout = {
@@ -71,6 +81,23 @@ function revokeGeneratedAd(ad: GeneratedAd | null) {
   if (!ad) return;
   if (ad.feedBlobUrl) URL.revokeObjectURL(ad.feedBlobUrl);
   if (ad.storiesBlobUrl) URL.revokeObjectURL(ad.storiesBlobUrl);
+}
+
+async function waitForRemainingQuota(timeoutMs = 25000): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const response = await fetch("/api/billing/usage");
+      if (response.ok) {
+        const data = (await response.json()) as { billing?: { remaining?: number } };
+        if ((data.billing?.remaining ?? 0) > 0) return true;
+      }
+    } catch {
+      // webhook can lag; keep polling
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  return false;
 }
 
 export const useWizardStore = create<WizardState>((set, get) => ({
@@ -106,6 +133,88 @@ export const useWizardStore = create<WizardState>((set, get) => ({
   setError: (error) =>
     set(error ? { error } : { error: null, quotaExceeded: false, deviceAccessBlocked: false }),
   setQuotaExceeded: (quotaExceeded) => set({ quotaExceeded }),
+
+  persistDraftForCheckout: async () => {
+    const { photo, adCategory, publishTarget, adStyle, mainMessage } = get();
+    if (!photo) throw new Error("Foto do produto é obrigatória.");
+    const prepared = await preparePhotoForApi(photo);
+    await saveWizardDraft({
+      version: 1,
+      adCategory,
+      publishTarget,
+      adStyle,
+      mainMessage,
+      photoBase64: prepared.base64,
+      photoMimeType: prepared.mimeType,
+      photoName: photo.name || "produto.jpg",
+      savedAt: Date.now(),
+    });
+  },
+
+  resumeFromCheckout: async () => {
+    if (typeof window === "undefined") return;
+    const resume = new URLSearchParams(window.location.search).get("resume");
+    if (resume !== "1" && resume !== "canceled") return;
+
+    window.history.replaceState({}, "", "/");
+    set({ isResuming: true, error: null });
+
+    try {
+      const draft = await loadWizardDraft();
+      if (draft) {
+        const file = draftToFile(draft);
+        get().setPhoto(file);
+        set({
+          step: 2,
+          adCategory: draft.adCategory,
+          publishTarget: draft.publishTarget,
+          adStyle: draft.adStyle,
+          mainMessage: draft.mainMessage,
+          quotaExceeded: true,
+        });
+      }
+
+      if (resume === "canceled") {
+        set({ isResuming: false, quotaExceeded: true, step: 2 });
+        return;
+      }
+
+      const ready = await waitForRemainingQuota();
+      await clearWizardDraft();
+
+      if (!ready) {
+        set({
+          isResuming: false,
+          quotaExceeded: true,
+          step: 2,
+          error:
+            "Assinatura ainda está sendo confirmada. Tente gerar de novo em instantes.",
+        });
+        return;
+      }
+
+      if (!get().photo) {
+        set({ isResuming: false, quotaExceeded: false, error: null });
+        return;
+      }
+
+      set({
+        isResuming: false,
+        quotaExceeded: false,
+        error: null,
+        isGenerating: true,
+      });
+      await get().generateAd();
+    } catch (error) {
+      set({
+        isResuming: false,
+        quotaExceeded: true,
+        step: 2,
+        error:
+          error instanceof Error ? error.message : "Não foi possível retomar o anúncio.",
+      });
+    }
+  },
 
   suggestText: async () => {
     const { adStyle, adCategory, publishTarget } = get();
@@ -185,9 +294,7 @@ export const useWizardStore = create<WizardState>((set, get) => ({
           set({
             quotaExceeded: true,
             deviceAccessBlocked: false,
-            error:
-              data.error ??
-              `Limite mensal atingido (${data.usage ?? "?"}/${data.limit ?? "?"}).`,
+            error: null,
           });
           return;
         }

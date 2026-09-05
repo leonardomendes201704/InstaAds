@@ -68,10 +68,19 @@ export function PlansPage() {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, returnTo: "planos" }),
       });
-      const json = (await res.json()) as { url?: string; error?: string };
+      const json = (await res.json()) as {
+        url?: string;
+        upgraded?: boolean;
+        error?: string;
+      };
       if (!res.ok) throw new Error(json.error ?? "Erro no checkout.");
+      if (json.upgraded) {
+        setMessage("Plano atualizado. O limite extra já vale neste mês.");
+        void load();
+        return;
+      }
       if (json.url) window.location.href = json.url;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro no checkout.");
@@ -174,7 +183,11 @@ export function PlansPage() {
                         onClick={() => void handleCheckout(plan.id)}
                         className="mt-4 w-full rounded-xl bg-accent-purple py-2.5 text-sm font-medium text-white disabled:opacity-60"
                       >
-                        {checkoutLoading === plan.id ? "Redirecionando..." : "Assinar"}
+                        {checkoutLoading === plan.id
+                          ? "Redirecionando..."
+                          : data?.billing && data.billing.plan.priceCents > 0
+                            ? "Fazer upgrade"
+                            : "Assinar"}
                       </button>
                     ) : null}
 

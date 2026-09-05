@@ -1,14 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Diamond, Sparkles, Square, Tag } from "lucide-react";
+import { PaywallSheet } from "@/components/billing/PaywallSheet";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { InfoBanner } from "@/components/ui/InfoBanner";
 import { LoadingOverlay } from "@/components/ui/LoadingOverlay";
 import { OptionCard } from "@/components/ui/OptionCard";
 import { DeviceAccessRequestButton } from "@/components/device/DeviceAccessRequestButton";
 import { WizardShell } from "@/components/wizard/WizardShell";
+import { clearWizardDraft } from "@/lib/wizard-draft";
 import type { AdStyle } from "@/lib/types";
 import { useWizardStore } from "@/stores/wizard-store";
 
@@ -42,17 +44,65 @@ export function Step2Personalize() {
     setStep,
     prevStep,
     generateAd,
+    setQuotaExceeded,
   } = useWizardStore();
+
+  const [atLimit, setAtLimit] = useState(quotaExceeded);
+  const [paywallOpen, setPaywallOpen] = useState(quotaExceeded);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/billing/usage");
+        if (!res.ok) return;
+        const data = (await res.json()) as { billing?: { remaining?: number } };
+        if ((data.billing?.remaining ?? 1) === 0) {
+          setAtLimit(true);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (quotaExceeded) {
+      setAtLimit(true);
+      setPaywallOpen(true);
+    }
+  }, [quotaExceeded]);
 
   const handleSuggestText = async () => {
     await useWizardStore.getState().suggestText();
   };
+
+  function handleContinue() {
+    if (atLimit) {
+      setPaywallOpen(true);
+      setQuotaExceeded(true);
+      return;
+    }
+    void generateAd();
+  }
+
+  async function handleUpgraded() {
+    setPaywallOpen(false);
+    setAtLimit(false);
+    setQuotaExceeded(false);
+    await clearWizardDraft();
+    await generateAd();
+  }
 
   return (
     <>
       {isGenerating ? (
         <LoadingOverlay message="A IA está criando sua arte publicitária..." />
       ) : null}
+      <PaywallSheet
+        open={paywallOpen}
+        onDismiss={() => setPaywallOpen(false)}
+        onUpgraded={() => void handleUpgraded()}
+      />
       <WizardShell
         step={2}
         title="Personalize seu anúncio"
@@ -61,9 +111,9 @@ export function Step2Personalize() {
           <GradientButton
             loading={isGenerating}
             disabled={isGenerating}
-            onClick={() => generateAd()}
+            onClick={handleContinue}
           >
-            Continuar →
+            {atLimit ? "Fazer upgrade" : "Continuar →"}
           </GradientButton>
         }
       >
@@ -138,14 +188,6 @@ export function Step2Personalize() {
           {error ? (
             <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-600">
               <p>{error}</p>
-              {quotaExceeded ? (
-                <Link
-                  href="/planos"
-                  className="mt-1 inline-block font-medium text-accent-purple underline"
-                >
-                  Ver planos e fazer upgrade
-                </Link>
-              ) : null}
               {deviceAccessBlocked ? <DeviceAccessRequestButton /> : null}
             </div>
           ) : null}

@@ -75,6 +75,8 @@ export async function createCheckoutSession(input: {
   email?: string;
   planId: string;
   promotionCode?: string;
+  origin?: string;
+  returnTo?: "wizard" | "planos";
 }): Promise<{ url: string }> {
   const stripe = await getStripeClient();
   if (!stripe) throw new Error("Stripe não configurado. Configure as chaves no admin.");
@@ -87,13 +89,19 @@ export async function createCheckoutSession(input: {
   if (plan.priceCents === 0) throw new Error("Plano gratuito não requer checkout.");
 
   const customerId = await getOrCreateStripeCustomer(input.userId, input.email);
+  const origin = (input.origin ?? siteConfig.url).replace(/\/$/, "");
+  const returnTo = input.returnTo ?? "planos";
+  const successUrl =
+    returnTo === "wizard" ? `${origin}/?resume=1` : `${origin}/planos?success=1`;
+  const cancelUrl =
+    returnTo === "wizard" ? `${origin}/?resume=canceled` : `${origin}/planos?canceled=1`;
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     mode: "subscription",
     line_items: [{ price: plan.stripePriceId, quantity: 1 }],
-    success_url: `${siteConfig.url}/planos?success=1`,
-    cancel_url: `${siteConfig.url}/planos?canceled=1`,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
     metadata: {
       userId: input.userId,
       planId: plan.id,

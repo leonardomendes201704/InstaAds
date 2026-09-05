@@ -30,20 +30,28 @@ export function UsageBadge() {
 
   const ratio = billing.limit > 0 ? billing.usage / billing.limit : 0;
   const warn = ratio >= 0.8;
+  const className = `mb-2 block rounded-xl border px-3 py-2 text-center text-xs transition-colors ${
+    warn
+      ? "border-amber-200 bg-amber-50 text-amber-900"
+      : "border-black/10 bg-surface text-muted hover:bg-white"
+  }`;
 
-  return (
-    <Link
-      href="/perfil"
-      className={`mb-2 block rounded-xl border px-3 py-2 text-center text-xs transition-colors ${
-        warn
-          ? "border-amber-200 bg-amber-50 text-amber-900"
-          : "border-black/10 bg-surface text-muted hover:bg-white"
-      }`}
-    >
+  const content = (
+    <>
       <span className="font-medium text-foreground">{billing.plan.name}</span>
       {" · "}
       {billing.usage}/{billing.limit} gerações este mês
       {billing.remaining === 0 ? " · Upgrade →" : null}
+    </>
+  );
+
+  if (billing.remaining === 0) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return (
+    <Link href="/perfil" className={className}>
+      {content}
     </Link>
   );
 }

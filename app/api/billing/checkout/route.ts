@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { createCheckoutSession } from "@/lib/stripe/checkout";
+import { subscribeToPlan } from "@/lib/billing/plan-change";
+import type { CheckoutReturnTo } from "@/lib/billing/paywall-types";
 import { isStripeConfigured } from "@/lib/db/settings";
+import { getRequestOrigin } from "@/lib/request-origin";
 import { requireCurrentUser } from "@/lib/user";
 
 export async function POST(request: Request) {
@@ -17,19 +19,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as { planId: string };
+    const body = (await request.json()) as {
+      planId?: string;
+      returnTo?: CheckoutReturnTo;
+    };
 
     if (!body.planId) {
       return NextResponse.json({ error: "planId obrigatório." }, { status: 400 });
     }
 
-    const session = await createCheckoutSession({
+    const returnTo: CheckoutReturnTo =
+      body.returnTo === "wizard" ? "wizard" : "planos";
+
+    const result = await subscribeToPlan({
       userId: user.id,
       email: user.email,
       planId: body.planId,
+      origin: getRequestOrigin(request),
+      returnTo,
     });
 
-    return NextResponse.json(session);
+    return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao iniciar checkout.";
     return NextResponse.json(
